@@ -1,0 +1,19 @@
+[Unit]
+Description=QL Packet Fragmentation Collector
+After=network-online.target redis-server.service docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/ql-packet-fragmentation
+EnvironmentFile=/etc/default/ql-packet-fragmentation
+ExecStart=/opt/ql-packet-fragmentation/scripts/run-service.sh
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

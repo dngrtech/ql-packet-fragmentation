@@ -51,6 +51,22 @@ sudo /opt/ql-packet-fragmentation/.venv/bin/python /opt/ql-packet-fragmentation/
   --influx-token-file /opt/ql-packet-fragmentation/secrets/influxdb-token
 ```
 
+## systemd Service
+
+The repo includes:
+
+- `deploy/systemd/ql-packet-fragmentation.service`
+- `deploy/systemd/ql-packet-fragmentation.env.example`
+- `scripts/run-service.sh`
+
+Recommended install on the host:
+
+1. Copy the env example to `/etc/default/ql-packet-fragmentation`.
+2. Install the unit file to `/etc/systemd/system/ql-packet-fragmentation.service`.
+3. Ensure `/opt/ql-packet-fragmentation/.venv` contains `influxdb-client`.
+4. Run `systemctl daemon-reload`.
+5. Run `systemctl enable --now ql-packet-fragmentation.service`.
+
 ## Measurements
 
 - `packet_stats`

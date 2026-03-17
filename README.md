@@ -102,7 +102,8 @@ Output (every 10 seconds):
   - Per-player correlation via `minqlx:server_status:<port>` -> `udp_port`
 - [ ] Phase 2 — InfluxDB persistence + systemd service
   - InfluxDB write path is implemented
-  - container deployment and collector service management are operational tasks
+  - Docker-hosted InfluxDB and a systemd collector service are deployed
+  - retention policy and operational hardening remain
 - [ ] Phase 3 — Grafana dashboards + publication charts
 - [ ] Phase 4 — Controlled 25k vs 99k experiments
 

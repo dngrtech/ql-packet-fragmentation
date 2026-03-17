@@ -26,8 +26,9 @@
 └────────────────────────────────────────────────────────────┘
 ```
 
-InfluxDB persistence is now implemented in the Python collector. Grafana and
-long-running service management remain later phases.
+InfluxDB persistence is now implemented in the Python collector. The current
+deployment also runs the collector under systemd. Grafana and longer-term
+retention/export work remain later phases.
 
 ## Capture Method
 
@@ -100,7 +101,7 @@ Measurements:
 Later phases will add:
 
 - Grafana dashboards
-- collector service management
+- retention and operational hardening
 - controlled 25k vs 99k experiment exports
 
 ## Overhead Analysis
