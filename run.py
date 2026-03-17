@@ -24,7 +24,7 @@ def parse_args():
     parser.add_argument(
         "--ports",
         default="27960-27963",
-        help="QL server port range (default: 27960-27963)",
+        help="QL server port or range (default: 27960-27963)",
     )
     parser.add_argument(
         "--interval",
@@ -33,19 +33,9 @@ def parse_args():
         help="Aggregation interval in seconds (default: 10)",
     )
     parser.add_argument(
-        "--rcon-password",
-        default=None,
-        help="QL server rcon password for player identification",
-    )
-    parser.add_argument(
-        "--rcon-host",
-        default="127.0.0.1",
-        help="QL server host for rcon (default: 127.0.0.1)",
-    )
-    parser.add_argument(
         "--redis-url",
         default=None,
-        help="Redis URL for player name lookup (e.g. redis://localhost:6379/3)",
+        help="Redis URL for player mapping (e.g. redis://localhost:6379/3)",
     )
     parser.add_argument(
         "--rate-setting",
@@ -92,12 +82,7 @@ def main():
     signal.signal(signal.SIGTERM, handle_signal)
 
     capture = PacketCapture(args.interface, port_min, port_max)
-    player_mapper = PlayerMapper(
-        rcon_host=args.rcon_host,
-        rcon_port=port_min,
-        rcon_password=args.rcon_password,
-        redis_url=args.redis_url,
-    )
+    player_mapper = PlayerMapper(redis_url=args.redis_url, port=port_min)
 
     try:
         capture.start()
