@@ -26,8 +26,8 @@
 └────────────────────────────────────────────────────────────┘
 ```
 
-InfluxDB and Grafana are planned later phases. They are not part of the
-current implementation.
+InfluxDB persistence is now implemented in the Python collector. Grafana and
+long-running service management remain later phases.
 
 ## Capture Method
 
@@ -79,18 +79,28 @@ IP-based correlation or rcon query is needed.
 
 ### 4. Terminal Output
 
-The current phase prints a terminal report per interval:
+The collector prints a terminal report per interval:
 
 - server-level fragmentation summary
 - histogram buckets
 - per-player rows when Redis mapping is available
 
+### 5. InfluxDB Write
+
+When configured, the collector also writes each interval to InfluxDB 2.x using
+the official Python client.
+
+Measurements:
+
+- `packet_stats`: one point per server port
+- `player_packets`: one point per mapped player per server port
+
 ## Planned Extensions
 
 Later phases will add:
 
-- InfluxDB persistence
 - Grafana dashboards
+- collector service management
 - controlled 25k vs 99k experiment exports
 
 ## Overhead Analysis

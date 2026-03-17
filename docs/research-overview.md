@@ -36,5 +36,5 @@ Any outbound UDP packet from the Quake server with a payload exceeding 1472 byte
 2. **In-kernel aggregation** via BPF maps — per-client-UDP-port packet size histograms
 3. **Userspace readout** in a Python daemon — reads BPF maps every 10 seconds
 4. **Per-player correlation** using the minqlx `serverchecker` Redis payload (`udp_port` -> steam/name)
-5. **Time-series storage** in InfluxDB with Grafana visualization (planned phase, not yet implemented)
+5. **Time-series storage** in InfluxDB with Grafana visualization
 6. **Controlled experiments**: Run matches at 25k and 99k with the same players/map/mode and compare fragmentation distributions

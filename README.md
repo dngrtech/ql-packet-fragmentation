@@ -12,7 +12,8 @@ Quake Live's `rate` cvar has two practical settings:
 This tool captures outbound server traffic via an eBPF program on TC egress,
 aggregates packet size distributions, and correlates them to individual
 players via the Redis status payload written by the bundled
-[`serverchecker` plugin](minqlx-plugins/serverchecker.py).
+[`serverchecker` plugin](minqlx-plugins/serverchecker.py). It can also write
+interval summaries to InfluxDB 2.x.
 
 ## Requirements
 
@@ -47,7 +48,11 @@ sudo python3 run.py \
   --ports 27960-27963 \
   --interval 10 \
   --rate-setting 99k \
-  --redis-url redis://localhost:6379/3
+  --redis-url redis://localhost:6379/3 \
+  --influx-url http://127.0.0.1:8086 \
+  --influx-org ql \
+  --influx-bucket ql_packet_fragmentation \
+  --influx-token-file /opt/ql-packet-fragmentation/secrets/influxdb-token
 ```
 
 Notes:
@@ -57,6 +62,21 @@ Notes:
 - When `--redis-url` is set for a range, its host/port/credentials are reused
   and the Redis DB index is derived from each server port (`27960 -> db1`,
   `27961 -> db2`, `27962 -> db3`, and so on).
+- InfluxDB writes are optional. If any of `--influx-url`, `--influx-org`,
+  `--influx-bucket`, or a token/token file are omitted, the collector runs in
+  terminal-only mode.
+
+## InfluxDB Measurements
+
+When InfluxDB is enabled, each interval writes:
+
+- `packet_stats`: one point per QL server port with total packets,
+  fragmented packets, average size, max size, and histogram bucket counts
+- `player_packets`: one point per mapped player per QL server port with
+  fragmented packet counts and average/max packet size
+
+Deployment details for the current containerized setup are in
+[`docs/influxdb-deployment.md`](docs/influxdb-deployment.md).
 
 Output (every 10 seconds):
 
@@ -81,6 +101,8 @@ Output (every 10 seconds):
   - TC egress capture on the real egress interface (`enp1s0` on the current host)
   - Per-player correlation via `minqlx:server_status:<port>` -> `udp_port`
 - [ ] Phase 2 — InfluxDB persistence + systemd service
+  - InfluxDB write path is implemented
+  - container deployment and collector service management are operational tasks
 - [ ] Phase 3 — Grafana dashboards + publication charts
 - [ ] Phase 4 — Controlled 25k vs 99k experiments
 
