@@ -24,6 +24,7 @@ def format_stats(
     player_map: Optional[Dict[int, Tuple[str, str]]] = None,
     rate_setting: Optional[str] = None,
     timestamp: Optional[str] = None,
+    server_port: Optional[int] = None,
 ) -> str:
     """Format aggregated stats for terminal output.
 
@@ -33,18 +34,21 @@ def format_stats(
                     display.
         rate_setting: Optional rate label (e.g. "99k").
         timestamp: Optional timestamp string (defaults to current time).
+        server_port: Optional QL server port label for multi-server output.
     """
     ts = timestamp or time.strftime('%H:%M:%S')
+    header = f"[{ts}]"
+    if server_port is not None:
+        header += f" port={server_port}"
     total = stats["total_packets"]
 
     if total == 0:
-        return f"[{ts}] No packets (0) captured in this interval."
+        return f"{header} No packets (0) captured in this interval."
 
     frag = stats["fragmented_packets"]
     frag_pct = (frag / total) * 100
 
     lines = []
-    header = f"[{ts}]"
     if rate_setting:
         header += f" rate={rate_setting}"
     header += f"  pkts={total}  frag={frag} ({frag_pct:.1f}%)  avg={stats['avg_size']:.0f}B  max={stats['max_size']}B"

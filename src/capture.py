@@ -10,6 +10,7 @@ from pyroute2 import IPRoute
 BPF_SOURCE = Path(__file__).parent / "bpf_program.c"
 
 PortData = Dict[int, List[Tuple[int, int]]]  # {client_udp_port: [(size, count), ...]}
+ServerData = Dict[int, PortData]  # {server_port: PortData}
 
 
 class PacketCapture:
@@ -52,29 +53,31 @@ class PacketCapture:
             direct_action=True,
         )
 
-    def read_and_clear(self) -> PortData:
+    def read_and_clear(self) -> ServerData:
         """Read all entries from the packet_counts map and clear it.
 
         Returns:
-            Dict mapping client UDP port to list of (udp_payload_size, count)
-            tuples.
+            Dict mapping QL server port to a client-port keyed packet map.
         """
         if self._bpf is None:
             return {}
 
         table = self._bpf["packet_counts"]
-        port_data: PortData = {}
+        server_data: ServerData = {}
 
         for key, val in table.items():
-            client_port = key.dest_port
+            server_port = key.server_port
+            client_port = key.client_port
             size = key.size_bucket
             count = val.value
-            if client_port not in port_data:
-                port_data[client_port] = []
-            port_data[client_port].append((size, count))
+            if server_port not in server_data:
+                server_data[server_port] = {}
+            if client_port not in server_data[server_port]:
+                server_data[server_port][client_port] = []
+            server_data[server_port][client_port].append((size, count))
 
         table.clear()
-        return port_data
+        return server_data
 
     def stop(self) -> None:
         """Detach TC filter and clean up."""

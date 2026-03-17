@@ -1,6 +1,6 @@
 # tests/test_player_map.py
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 from src.player_map import build_player_map, PlayerMapper
 
 
@@ -57,13 +57,49 @@ class TestBuildPlayerMap:
 
 class TestPlayerMapper:
     def test_disabled_when_no_redis_url(self):
-        mapper = PlayerMapper(redis_url=None, port=27962)
-        assert mapper.get_map() == {}
+        mapper = PlayerMapper(redis_url=None, ports=[27962, 27963])
+        assert mapper.get_map(27962) == {}
+        assert mapper.get_map(27963) == {}
 
     def test_refresh_calls_build(self):
         with patch("src.player_map.build_player_map") as mock_build:
             mock_build.return_value = {20725: ("76561199795317792", "rage")}
             with patch("src.player_map.redis.from_url"):
-                mapper = PlayerMapper(redis_url="redis://localhost:6379/3", port=27962)
+                mapper = PlayerMapper(redis_url="redis://localhost:6379/3", ports=[27962])
                 mapper.refresh()
-                assert mapper.get_map() == {20725: ("76561199795317792", "rage")}
+                assert mapper.get_map(27962) == {20725: ("76561199795317792", "rage")}
+
+    def test_multi_port_uses_derived_redis_dbs(self):
+        with patch("src.player_map.redis.from_url") as mock_from_url:
+            PlayerMapper(
+                redis_url="redis://localhost:6379/3",
+                ports=[27960, 27962],
+            )
+        assert mock_from_url.call_args_list == [
+            call("redis://localhost:6379/1"),
+            call("redis://localhost:6379/3"),
+        ]
+
+    def test_refresh_builds_map_per_server_port(self):
+        with patch("src.player_map.redis.from_url") as mock_from_url:
+            client_27960 = MagicMock()
+            client_27962 = MagicMock()
+            mock_from_url.side_effect = [client_27960, client_27962]
+            mapper = PlayerMapper(
+                redis_url="redis://localhost:6379/3",
+                ports=[27960, 27962],
+            )
+
+        with patch("src.player_map.build_player_map") as mock_build:
+            mock_build.side_effect = [
+                {11111: ("76561198000000001", "anarki")},
+                {22222: ("76561198000000002", "visor")},
+            ]
+            mapper.refresh()
+
+        assert mock_build.call_args_list == [
+            call(client_27960, 27960),
+            call(client_27962, 27962),
+        ]
+        assert mapper.get_map(27960) == {11111: ("76561198000000001", "anarki")}
+        assert mapper.get_map(27962) == {22222: ("76561198000000002", "visor")}

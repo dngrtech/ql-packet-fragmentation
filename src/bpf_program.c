@@ -6,9 +6,10 @@
  * real client IP before they reach lo — so all QL→client egress exits on enp1s0.
  *
  * Filters outbound UDP packets where source port is in the configured QL
- * server port range, records (dest_port, packet_size) into a BPF hash map.
- * dest_port is the client's UDP source port as seen by the server. The
- * serverchecker plugin exports the same value as `udp_port` for correlation.
+ * server port range, records (server_port, client_port, packet_size) into a
+ * BPF hash map. client_port is the client's UDP source port as seen by the
+ * server. The serverchecker plugin exports the same value as `udp_port` for
+ * correlation.
  *
  * Loaded by BCC at runtime — port range injected via cflags (-DPORT_MIN, -DPORT_MAX).
  */
@@ -25,11 +26,12 @@
  */
 
 struct packet_key {
-    u32 dest_port;   /* client UDP port used for correlation */
+    u32 server_port; /* QL server UDP port */
+    u32 client_port; /* client UDP port used for correlation */
     u32 size_bucket; /* UDP payload size, bucketed in userspace */
 };
 
-/* Map: (dest_port, udp_payload_size) -> packet_count */
+/* Map: (server_port, client_port, udp_payload_size) -> packet_count */
 BPF_HASH(packet_counts, struct packet_key, u64, 16384);
 
 int classify(struct __sk_buff *skb) {
@@ -68,9 +70,10 @@ int classify(struct __sk_buff *skb) {
         return TC_ACT_OK;
     u16 udp_payload = udp_len - 8;
 
-    /* Key: client UDP destination port + payload size */
+    /* Key: QL server port + client UDP destination port + payload size */
     struct packet_key key = {};
-    key.dest_port = bpf_ntohs(udp->dest);
+    key.server_port = sport;
+    key.client_port = bpf_ntohs(udp->dest);
     key.size_bucket = udp_payload;
 
     u64 *count = packet_counts.lookup_or_try_init(&key, &(u64){0});

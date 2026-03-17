@@ -73,3 +73,5 @@ Those keys are not required by the current capture path.
 - Redis default port: 6379, localhost
 - `udp_port` must be present in `minqlx:server_status:<port>` for per-player
   packet attribution to work
+- In multi-server capture mode, the collector reuses the `--redis-url`
+  host/port/credentials and derives the DB index from each server port

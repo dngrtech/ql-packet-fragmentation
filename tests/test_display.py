@@ -71,3 +71,27 @@ class TestFormatStats:
         assert "testplayer" in output
         assert "76561197960700239" in output
         assert "20.0%" in output
+
+    def test_server_port_included_for_multi_server_output(self):
+        stats = {
+            "total_packets": 10,
+            "fragmented_packets": 0,
+            "avg_size": 250.0,
+            "max_size": 400,
+            "buckets": [10, 0, 0, 0],
+            "per_port": {},
+        }
+        output = format_stats(stats, server_port=27962)
+        assert "port=27962" in output
+
+    def test_zero_packets_includes_server_port_when_provided(self):
+        stats = {
+            "total_packets": 0,
+            "fragmented_packets": 0,
+            "avg_size": 0.0,
+            "max_size": 0,
+            "buckets": [0, 0, 0, 0],
+            "per_port": {},
+        }
+        output = format_stats(stats, server_port=27962)
+        assert "port=27962" in output

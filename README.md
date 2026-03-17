@@ -44,11 +44,19 @@ redis-cli -n 3 get minqlx:server_status:27962 | python3 -m json.tool
 ```bash
 sudo python3 run.py \
   --interface enp1s0 \
-  --ports 27962 \
+  --ports 27960-27963 \
   --interval 10 \
   --rate-setting 99k \
   --redis-url redis://localhost:6379/3
 ```
+
+Notes:
+
+- `--ports` accepts a single QL port or a range.
+- In multi-port mode, the collector prints one report per server port.
+- When `--redis-url` is set for a range, its host/port/credentials are reused
+  and the Redis DB index is derived from each server port (`27960 -> db1`,
+  `27961 -> db2`, `27962 -> db3`, and so on).
 
 Output (every 10 seconds):
 

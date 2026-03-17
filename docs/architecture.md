@@ -11,7 +11,8 @@
 │  │ on `enp1s0`    │     │ - read BPF map every N sec    │  │
 │  │                │     │ - aggregate packet sizes      │  │
 │  │ key:           │     │ - join with Redis player map  │  │
-│  │ (dest port,    │     │ - print terminal summary      │  │
+│  │ (server port,  │     │ - print terminal summary      │  │
+│  │  dest port,    │     │   per server instance         │  │
 │  │  payload size) │     └───────────────────────────────┘  │
 │  └────────────────┘                    ▲                   │
 │                                        │                   │
@@ -34,8 +35,9 @@ current implementation.
 
 An eBPF program attached to TC egress on the real outbound interface inspects
 UDP packets whose source port matches the Quake Live server port range. Packet
-metadata `(destination UDP port, UDP payload length)` is aggregated directly
-into a BPF hash map, which Python reads on a fixed interval.
+metadata `(server UDP port, destination UDP port, UDP payload length)` is
+aggregated directly into a BPF hash map, which Python reads on a fixed
+interval.
 
 ### Why eBPF over tcpdump
 
@@ -49,12 +51,13 @@ into a BPF hash map, which Python reads on a fixed interval.
 ### 1. Packet Capture
 
 The kernel program runs on TC egress, filters outbound UDP packets for the QL
-server port range, and increments counters keyed by `(client_udp_port,
-udp_payload_size)`.
+server port range, and increments counters keyed by `(server_port,
+client_udp_port, udp_payload_size)`.
 
 ### 2. In-Memory Aggregation
 
-Every interval, Python computes server-level and per-port stats:
+Every interval, Python computes server-level and per-client-port stats for each
+captured QL server port:
 - Total packet count
 - Fragmented packet count (payload > 1472 bytes)
 - Average packet size

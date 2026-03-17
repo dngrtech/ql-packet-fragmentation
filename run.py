@@ -35,7 +35,11 @@ def parse_args():
     parser.add_argument(
         "--redis-url",
         default=None,
-        help="Redis URL for player mapping (e.g. redis://localhost:6379/3)",
+        help=(
+            "Redis URL for player mapping. In multi-port mode, the host/port/"
+            "credentials are reused and the DB index is derived per server "
+            "port (e.g. redis://localhost:6379/3)"
+        ),
     )
     parser.add_argument(
         "--rate-setting",
@@ -67,6 +71,7 @@ def main():
     args = parse_args()
 
     port_min, port_max = parse_port_range(args.ports)
+    server_ports = list(range(port_min, port_max + 1))
 
     print("QL Packet Fragmentation Capture (eBPF)")
     print(f"Interface: {args.interface}  Ports: {port_min}-{port_max}  Interval: {args.interval}s")
@@ -82,7 +87,7 @@ def main():
     signal.signal(signal.SIGTERM, handle_signal)
 
     capture = PacketCapture(args.interface, port_min, port_max)
-    player_mapper = PlayerMapper(redis_url=args.redis_url, port=port_min)
+    player_mapper = PlayerMapper(redis_url=args.redis_url, ports=server_ports)
 
     try:
         capture.start()
@@ -93,14 +98,19 @@ def main():
             time.sleep(args.interval)
 
             player_mapper.maybe_refresh()
-            port_data = capture.read_and_clear()
-            stats = aggregate_packets(port_data)
-            output = format_stats(
-                stats,
-                player_map=player_mapper.get_map(),
-                rate_setting=args.rate_setting,
-            )
-            print(output)
+            server_data = capture.read_and_clear()
+            outputs = []
+            for server_port in server_ports:
+                stats = aggregate_packets(server_data.get(server_port, {}))
+                outputs.append(
+                    format_stats(
+                        stats,
+                        player_map=player_mapper.get_map(server_port),
+                        rate_setting=args.rate_setting,
+                        server_port=server_port if len(server_ports) > 1 else None,
+                    )
+                )
+            print("\n\n".join(outputs))
             print()
 
     finally:
