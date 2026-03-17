@@ -15,7 +15,7 @@ class TestAggregatePackets:
         assert result["buckets"] == [0, 0, 0, 0]
 
     def test_single_small_packet(self):
-        # port_data: {qport: [(size, count), ...]}
+        # port_data: {client_udp_port: [(size, count), ...]}
         port_data = {56650: [(400, 5)]}
         result = aggregate_packets(port_data)
         assert result["total_packets"] == 5

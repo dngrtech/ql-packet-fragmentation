@@ -9,7 +9,7 @@ from pyroute2 import IPRoute
 
 BPF_SOURCE = Path(__file__).parent / "bpf_program.c"
 
-PortData = Dict[int, List[Tuple[int, int]]]  # {qport: [(size, count), ...]}
+PortData = Dict[int, List[Tuple[int, int]]]  # {client_udp_port: [(size, count), ...]}
 
 
 class PacketCapture:
@@ -22,6 +22,7 @@ class PacketCapture:
         self._bpf = None
         self._ipr = None
         self._ifindex = None
+        self._owns_clsact = False
 
     def start(self) -> None:
         """Load BPF program and attach to TC egress via pyroute2."""
@@ -38,6 +39,7 @@ class PacketCapture:
 
         try:
             self._ipr.tc("add", "clsact", self._ifindex)
+            self._owns_clsact = True
         except Exception:
             pass  # clsact qdisc may already exist
 
@@ -54,7 +56,8 @@ class PacketCapture:
         """Read all entries from the packet_counts map and clear it.
 
         Returns:
-            Dict mapping client qport to list of (udp_payload_size, count) tuples.
+            Dict mapping client UDP port to list of (udp_payload_size, count)
+            tuples.
         """
         if self._bpf is None:
             return {}
@@ -63,12 +66,12 @@ class PacketCapture:
         port_data: PortData = {}
 
         for key, val in table.items():
-            qport = key.dest_port
+            client_port = key.dest_port
             size = key.size_bucket
             count = val.value
-            if qport not in port_data:
-                port_data[qport] = []
-            port_data[qport].append((size, count))
+            if client_port not in port_data:
+                port_data[client_port] = []
+            port_data[client_port].append((size, count))
 
         table.clear()
         return port_data
@@ -76,12 +79,14 @@ class PacketCapture:
     def stop(self) -> None:
         """Detach TC filter and clean up."""
         if self._ipr and self._ifindex:
-            try:
-                self._ipr.tc("del", "clsact", self._ifindex)
-            except Exception:
-                pass
+            if self._owns_clsact:
+                try:
+                    self._ipr.tc("del", "clsact", self._ifindex)
+                except Exception:
+                    pass
             self._ipr.close()
             self._ipr = None
+            self._owns_clsact = False
         if self._bpf is not None:
             self._bpf.cleanup()
             self._bpf = None

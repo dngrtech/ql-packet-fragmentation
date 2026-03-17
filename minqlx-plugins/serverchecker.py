@@ -219,13 +219,16 @@ class serverchecker(minqlx.Plugin):
             players = []
             for p in self.players():
                 try:
+                    # Player.ip strips the port; use the raw field so Redis has the
+                    # actual client UDP port that the eBPF program sees.
+                    raw_ip = p["ip"] if "ip" in p else ""
                     players.append({
                         "name":  p.name,
                         "steam": str(p.steam_id),
                         "score": p.score if hasattr(p, "score") else 0,
                         "ping":  p.ping  if hasattr(p, "ping")  else 0,
                         "team":  str(p.team),
-                        "udp_port": int(p.ip.split(":")[1]) if p.ip and ":" in p.ip else None,
+                        "udp_port": int(raw_ip.split(":")[1]) if raw_ip and ":" in raw_ip else None,
                     })
                 except Exception as pe:
                     self.logger.warning(f"serverchecker: player error: {pe}")

@@ -29,7 +29,8 @@ def format_stats(
 
     Args:
         stats: Output from aggregate_packets().
-        player_map: Optional {qport: (steamid, name)} for per-player display.
+        player_map: Optional {client_udp_port: (steamid, name)} for per-player
+                    display.
         rate_setting: Optional rate label (e.g. "99k").
         timestamp: Optional timestamp string (defaults to current time).
     """
@@ -58,17 +59,17 @@ def format_stats(
         bar = format_histogram_bar(count, total)
         lines.append(f"  {label}  {count:>6}  {pct:>5.1f}%  {bar}")
 
-    # Per-player breakdown keyed by qport → (steamid, name)
+    # Per-player breakdown keyed by client UDP port -> (steamid, name)
     if stats.get("per_port") and player_map:
         lines.append("")
         lines.append("  Per-Player Breakdown:")
         lines.append(f"  {'Player':<22} {'SteamID':>17} {'Pkts':>6} {'Frag':>6} {'Frag%':>7} {'Avg':>6} {'Max':>6}")
         lines.append("  " + "-" * 72)
-        for qport, port_stats in sorted(stats["per_port"].items()):
-            if qport in player_map:
-                steamid, name = player_map[qport]
+        for client_port, port_stats in sorted(stats["per_port"].items()):
+            if client_port in player_map:
+                steamid, name = player_map[client_port]
             else:
-                name, steamid = f"port:{qport}", ""
+                name, steamid = f"port:{client_port}", ""
             p_total = port_stats["total_packets"]
             p_frag = port_stats["fragmented_packets"]
             p_frag_pct = (p_frag / p_total) * 100 if p_total else 0

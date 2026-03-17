@@ -22,19 +22,19 @@ def _bucket_index(size: int) -> int:
     return 2  # [1000, 1472] — fits in MTU
 
 
-PortData = Dict[int, List[Tuple[int, int]]]  # {qport: [(size, count), ...]}
+PortData = Dict[int, List[Tuple[int, int]]]  # {client_udp_port: [(size, count), ...]}
 
 
 def aggregate_packets(port_data: PortData) -> dict:
-    """Aggregate per-qport packet size data into summary stats.
+    """Aggregate per-client-port packet size data into summary stats.
 
     Args:
-        port_data: Dict mapping client qport to list of (packet_size, count) tuples.
-                   This is the format read from BPF maps.
+        port_data: Dict mapping client UDP port to list of (packet_size, count)
+                   tuples. This is the format read from BPF maps.
 
     Returns:
         Dict with keys: total_packets, fragmented_packets, avg_size, max_size,
-        buckets (list of 4 counts), per_port (dict of per-qport stats).
+        buckets (list of 4 counts), per_port (dict of per-port stats).
     """
     total_packets = 0
     fragmented_packets = 0
@@ -43,7 +43,7 @@ def aggregate_packets(port_data: PortData) -> dict:
     buckets = [0, 0, 0, 0]
     per_port = {}
 
-    for qport, entries in port_data.items():
+    for client_port, entries in port_data.items():
         port_total = 0
         port_frag = 0
         port_size_sum = 0
@@ -58,7 +58,7 @@ def aggregate_packets(port_data: PortData) -> dict:
                 port_frag += count
             buckets[_bucket_index(size)] += count
 
-        per_port[qport] = {
+        per_port[client_port] = {
             "total_packets": port_total,
             "fragmented_packets": port_frag,
             "avg_size": port_size_sum / port_total if port_total else 0.0,

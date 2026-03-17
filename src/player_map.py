@@ -10,7 +10,7 @@ import redis
 
 REFRESH_INTERVAL = 30  # seconds
 
-PlayerMap = Dict[int, Tuple[str, str]]  # {qport: (steamid, name)}
+PlayerMap = Dict[int, Tuple[str, str]]  # {client_udp_port: (steamid, name)}
 
 # Strip Quake color codes (^N or ^X where X is a digit/color char)
 _COLOR_RE = re.compile(r'\^\d')
@@ -21,9 +21,11 @@ def _strip_colors(name: str) -> str:
 
 
 def build_player_map(r: redis.Redis, port: int) -> PlayerMap:
-    """Read minqlx:server_status:<port> and return {qport: (steamid, name)}.
+    """Read minqlx:server_status:<port> and return {client_udp_port: (steamid, name)}.
 
-    Bots have qport == -1 and are excluded. No IP addresses involved.
+    `udp_port` is taken from minqlx's raw `"ip"` player field, so it matches
+    the UDP destination port observed by eBPF. Bots expose `udp_port == -1`
+    and are excluded. No IP addresses are stored by this tool.
     """
     raw = r.get(f"minqlx:server_status:{port}")
     if not raw:
@@ -36,18 +38,18 @@ def build_player_map(r: redis.Redis, port: int) -> PlayerMap:
 
     result: PlayerMap = {}
     for p in status.get("players", []):
-        qport = p.get("udp_port")
-        if not qport or qport < 0:
+        client_port = p.get("udp_port")
+        if not client_port or client_port < 0:
             continue  # bot or unknown
         steamid = str(p.get("steam", ""))
         name = _strip_colors(p.get("name", steamid))
-        result[qport] = (steamid, name)
+        result[client_port] = (steamid, name)
 
     return result
 
 
 class PlayerMapper:
-    """Manages periodic refresh of the qport -> (steamid, name) mapping."""
+    """Manages periodic refresh of the client-port -> (steamid, name) mapping."""
 
     def __init__(self, redis_url: Optional[str], port: int):
         self._port = port

@@ -1,52 +1,41 @@
 # Architecture
 
-## System Overview
+## Current System Overview
 
 ```
-┌─────────────────────────────────────────────────┐
-│  Quake Live Server (per instance)               │
-│                                                  │
-│  ┌──────────┐    ┌─────────────────────────┐    │
-│  │ eBPF     │───→│ Python Userspace        │    │
-│  │ (TC/XDP  │    │  - read BPF maps (10s)   │    │
-│  │  egress) │    │  - periodic Redis lookup │    │
-│  └──────────┘    │    for player mapping     │    │
-│                  │  - write to InfluxDB     │    │
-│  ┌──────────┐    │                           │    │
-│  │ Redis    │───→│                           │    │
-│  │ (minqlx) │    └─────────────────────────┘    │
-│  └──────────┘                                    │
-└──────────────────────┬──────────────────────────┘
-                       │
-                       ▼
-              ┌─────────────────┐
-              │   InfluxDB      │
-              │                 │
-              │ Measurements:   │
-              │ - packet_stats  │
-              │   (aggregated)  │
-              │ - player_frag   │
-              │   (per-player)  │
-              └────────┬────────┘
-                       │
-                       ▼
-              ┌─────────────────┐
-              │   Grafana       │
-              │                 │
-              │ - Frag % over   │
-              │   time          │
-              │ - Per-player    │
-              │   frag rates    │
-              │ - Size distrib  │
-              │   histogram     │
-              └─────────────────┘
+┌────────────────────────────────────────────────────────────┐
+│ Quake Live host                                            │
+│                                                            │
+│  ┌────────────────┐     ┌───────────────────────────────┐  │
+│  │ TC egress eBPF │────→│ Python userspace (`run.py`)   │  │
+│  │ on `enp1s0`    │     │ - read BPF map every N sec    │  │
+│  │                │     │ - aggregate packet sizes      │  │
+│  │ key:           │     │ - join with Redis player map  │  │
+│  │ (dest port,    │     │ - print terminal summary      │  │
+│  │  payload size) │     └───────────────────────────────┘  │
+│  └────────────────┘                    ▲                   │
+│                                        │                   │
+│  ┌──────────────────────────────┐      │                   │
+│  │ minqlx `serverchecker` plugin│──────┘                   │
+│  │ Redis key:                   │                          │
+│  │ `minqlx:server_status:<port>`│                          │
+│  │ player fields include        │                          │
+│  │ `name`, `steam`, `udp_port`  │                          │
+│  └──────────────────────────────┘                          │
+└────────────────────────────────────────────────────────────┘
 ```
+
+InfluxDB and Grafana are planned later phases. They are not part of the
+current implementation.
 
 ## Capture Method
 
 **eBPF** — chosen for in-kernel aggregation with zero userspace packet copies.
 
-An eBPF program attached to the network interface (TC egress or XDP) inspects outbound UDP packets on QL ports. Packet metadata (length, destination IP, port) is recorded into BPF maps, which the Python userspace component reads on a 10-second interval. The kernel version is frozen to avoid BPF verifier compatibility issues.
+An eBPF program attached to TC egress on the real outbound interface inspects
+UDP packets whose source port matches the Quake Live server port range. Packet
+metadata `(destination UDP port, UDP payload length)` is aggregated directly
+into a BPF hash map, which Python reads on a fixed interval.
 
 ### Why eBPF over tcpdump
 
@@ -57,59 +46,49 @@ An eBPF program attached to the network interface (TC egress or XDP) inspects ou
 
 ## Data Pipeline
 
-### 1. Packet Capture (eBPF → BPF Maps → Python)
+### 1. Packet Capture
 
-eBPF program runs in kernel, inspects each outbound UDP packet on QL ports. Per-packet metadata (destination IP, UDP payload length) is aggregated directly into BPF maps (per-IP histograms). Python reads maps every 10 seconds.
+The kernel program runs on TC egress, filters outbound UDP packets for the QL
+server port range, and increments counters keyed by `(client_udp_port,
+udp_payload_size)`.
 
 ### 2. In-Memory Aggregation
 
-Every 10 seconds, the aggregator computes per-port and per-player stats:
+Every interval, Python computes server-level and per-port stats:
 - Total packet count
 - Fragmented packet count (payload > 1472 bytes)
 - Average packet size
 - Max packet size
 - Histogram buckets: [0-500, 500-1000, 1000-1472, 1472+]
 
-### 3. Player Mapping (rcon + Redis → Python, transient)
+### 3. Player Mapping
 
-At each interval, send rcon `status` to the QL server to get currently connected players
-and their session IPs. Build a transient in-memory map `{ip: (steamid, player_name)}`.
-Look up each steamid's display name from Redis (`minqlx:players:<steamid>` LINDEX 0).
-Discard the IP mapping after the interval — IPs are never stored anywhere.
+The bundled `serverchecker` plugin writes
+`minqlx:server_status:<server_port>` to the same Redis instance already used by
+minqlx. Each player entry includes `name`, `steam`, and `udp_port`.
 
-### 4. InfluxDB Write
+Userspace reads that JSON payload and builds a transient map:
 
-Every 10 seconds, flush aggregated data to InfluxDB.
+`{udp_port: (steamid, cleaned_name)}`
 
-## InfluxDB Schema
+That `udp_port` matches the packet destination port captured by eBPF, so no
+IP-based correlation or rcon query is needed.
 
-### Measurement: `packet_stats` (10-second server-level aggregates)
+### 4. Terminal Output
 
-| Type   | Name               | Description                          |
-|--------|--------------------|--------------------------------------|
-| Tag    | server_port        | QL server port (e.g., 27960)         |
-| Tag    | rate_setting       | Engine rate (25k or 99k)             |
-| Field  | total_packets      | Total outbound packets               |
-| Field  | fragmented_packets | Packets with payload > 1472 bytes    |
-| Field  | avg_size           | Average payload size in bytes        |
-| Field  | max_size           | Maximum payload size in bytes        |
-| Field  | bucket_0_500       | Count of packets 0–500 bytes         |
-| Field  | bucket_500_1000    | Count of packets 500–1000 bytes      |
-| Field  | bucket_1000_1472   | Count of packets 1000–1472 bytes     |
-| Field  | bucket_1472_plus   | Count of packets > 1472 bytes        |
+The current phase prints a terminal report per interval:
 
-### Measurement: `player_packets` (10-second per-player aggregates)
+- server-level fragmentation summary
+- histogram buckets
+- per-player rows when Redis mapping is available
 
-| Type   | Name               | Description                          |
-|--------|--------------------|--------------------------------------|
-| Tag    | server_port        | QL server port                       |
-| Tag    | steam_id           | Player's Steam ID                    |
-| Tag    | player_name        | Player name (from minqlx Redis)      |
-| Tag    | rate_setting       | Engine rate (25k or 99k)             |
-| Field  | total_packets      | Packets sent to this player          |
-| Field  | fragmented_packets | Fragmented packets to this player    |
-| Field  | avg_size           | Avg payload size to this player      |
-| Field  | max_size           | Max payload size to this player      |
+## Planned Extensions
+
+Later phases will add:
+
+- InfluxDB persistence
+- Grafana dashboards
+- controlled 25k vs 99k experiment exports
 
 ## Overhead Analysis
 

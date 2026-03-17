@@ -7,7 +7,8 @@
  *
  * Filters outbound UDP packets where source port is in the configured QL
  * server port range, records (dest_port, packet_size) into a BPF hash map.
- * dest_port is the client's qport — unique per session, used for player correlation.
+ * dest_port is the client's UDP source port as seen by the server. The
+ * serverchecker plugin exports the same value as `udp_port` for correlation.
  *
  * Loaded by BCC at runtime — port range injected via cflags (-DPORT_MIN, -DPORT_MAX).
  */
@@ -24,7 +25,7 @@
  */
 
 struct packet_key {
-    u32 dest_port;   /* client qport — unique per session */
+    u32 dest_port;   /* client UDP port used for correlation */
     u32 size_bucket; /* UDP payload size, bucketed in userspace */
 };
 
@@ -67,7 +68,7 @@ int classify(struct __sk_buff *skb) {
         return TC_ACT_OK;
     u16 udp_payload = udp_len - 8;
 
-    /* Key: client qport (dest) + payload size */
+    /* Key: client UDP destination port + payload size */
     struct packet_key key = {};
     key.dest_port = bpf_ntohs(udp->dest);
     key.size_bucket = udp_payload;
