@@ -9,11 +9,13 @@ Scientific analysis of network packet fragmentation in competitive Quake Live (4
 Quake Live's `rate` cvar controls how much game state data the server sends per snapshot. Two common settings create a fundamental tradeoff:
 
 - **25k rate**: Prevents fragmentation by limiting payload size, but causes "engine choke" during chaotic moments — the engine drops/delays game state (audio cues, player movement) to stay within the size budget.
-- **99k rate**: Sends complete game state regardless of size, but produces packets that exceed the MTU, triggering IP-layer fragmentation. Lost fragments invalidate entire packets, causing perceived lag ("delayed rockets").
+- **99k rate (LAN rate)**: Sends complete game state regardless of size, but produces packets that exceed the MTU, triggering IP-layer fragmentation. Lost fragments invalidate entire packets, causing perceived lag ("delayed rockets").
+
+These are the only two supported rate settings. There is no configurable middle ground.
 
 ## The Hypothesis
 
-A `rate` setting around **50k–52k** may provide the sweet spot: large enough to avoid engine choke in 4v4 Clan Arena fights, small enough to avoid routine fragmentation.
+If a hypothetical `rate` setting around **50k–52k** existed, it could provide the sweet spot: large enough to avoid engine choke in 4v4 Clan Arena fights, small enough to avoid routine fragmentation. This setting does not currently exist in the engine — the research aims to quantify the fragmentation problem at 99k to build the empirical case for why such a middle-ground option should be added.
 
 ## Fragmentation Threshold (Standard Network)
 
@@ -30,8 +32,9 @@ Any outbound UDP packet from the Quake server with a payload exceeding 1472 byte
 
 ## Research Methodology
 
-1. **Passive packet capture** on the Quake server using tcpdump with BPF kernel filtering (outbound UDP only)
-2. **In-memory aggregation** in a Python daemon — 10-second bucketed stats
-3. **Per-player correlation** using minqlx Redis data (steamid → IP mapping)
-4. **Time-series storage** in InfluxDB with Grafana visualization
-5. **Controlled experiments**: Run matches at 25k, 50k, 75k, 99k with the same players/map/mode and compare fragmentation distributions
+1. **Passive packet capture** on the Quake server using eBPF (TC egress hook) — in-kernel filtering, outbound UDP only
+2. **In-kernel aggregation** via BPF maps — per-destination-IP packet size histograms
+3. **Userspace readout** in a Python daemon — reads BPF maps every 10 seconds
+4. **Per-player correlation** using minqlx Redis data (steamid → IP mapping)
+5. **Time-series storage** in InfluxDB with Grafana visualization
+6. **Controlled experiments**: Run matches at 25k and 99k with the same players/map/mode and compare fragmentation distributions

@@ -7,12 +7,12 @@
 │  Quake Live Server (per instance)               │
 │                                                  │
 │  ┌──────────┐    ┌─────────────────────────┐    │
-│  │ tcpdump  │───→│ Python Aggregator       │    │
-│  │ (BPF     │    │  - parse packet lengths  │    │
-│  │  filter) │    │  - 10s in-memory buckets │    │
-│  └──────────┘    │  - periodic Redis lookup │    │
-│                  │    for player mapping     │    │
-│  ┌──────────┐    │  - write to InfluxDB     │    │
+│  │ eBPF     │───→│ Python Userspace        │    │
+│  │ (TC/XDP  │    │  - read BPF maps (10s)   │    │
+│  │  egress) │    │  - periodic Redis lookup │    │
+│  └──────────┘    │    for player mapping     │    │
+│                  │  - write to InfluxDB     │    │
+│  ┌──────────┐    │                           │    │
 │  │ Redis    │───→│                           │    │
 │  │ (minqlx) │    └─────────────────────────┘    │
 │  └──────────┘                                    │
@@ -44,31 +44,22 @@
 
 ## Capture Method
 
-**tcpdump with BPF filter** — chosen for lowest practical overhead at ~320 packets/sec.
+**eBPF** — chosen for in-kernel aggregation with zero userspace packet copies.
 
-The BPF filter runs in kernel space, so only matching packets (outbound UDP on QL ports) are copied to userspace. At 320 pps this is negligible overhead.
+An eBPF program attached to the network interface (TC egress or XDP) inspects outbound UDP packets on QL ports. Packet metadata (length, destination IP, port) is recorded into BPF maps, which the Python userspace component reads on a 10-second interval. The kernel version is frozen to avoid BPF verifier compatibility issues.
 
-For the paper, we can optionally benchmark against eBPF to prove both methods produce identical results and neither affects gameplay.
+### Why eBPF over tcpdump
 
-### Capture command
-
-```bash
-tcpdump -n -l -e -Q out udp and src portrange 27960-27963
-```
-
-- `-n`: no DNS resolution (saves CPU)
-- `-l`: line-buffered output (for piping to Python)
-- `-e`: show link-layer header (includes frame length)
-- `-Q out`: outbound only
+- No per-packet copy to userspace — aggregation happens in kernel
+- BPF maps provide structured data directly (no line parsing)
+- Lower overhead at any packet rate
+- Kernel version frozen, so BPF CO-RE portability is not a concern
 
 ## Data Pipeline
 
-### 1. Packet Capture (tcpdump → Python)
+### 1. Packet Capture (eBPF → BPF Maps → Python)
 
-tcpdump outputs one line per packet. Python reads lines, extracts:
-- Timestamp
-- Destination IP (→ maps to player)
-- Packet length (UDP payload size)
+eBPF program runs in kernel, inspects each outbound UDP packet on QL ports. Per-packet metadata (destination IP, UDP payload length) is aggregated directly into BPF maps (per-IP histograms). Python reads maps every 10 seconds.
 
 ### 2. In-Memory Aggregation
 
@@ -102,7 +93,7 @@ Every 10 seconds, flush aggregated data to InfluxDB.
 | Type   | Name               | Description                          |
 |--------|--------------------|--------------------------------------|
 | Tag    | server_port        | QL server port (e.g., 27960)         |
-| Tag    | rate_setting       | Engine rate (25k, 50k, 99k)          |
+| Tag    | rate_setting       | Engine rate (25k or 99k)             |
 | Field  | total_packets      | Total outbound packets               |
 | Field  | fragmented_packets | Packets with payload > 1472 bytes    |
 | Field  | avg_size           | Average payload size in bytes        |
@@ -120,7 +111,7 @@ Every 10 seconds, flush aggregated data to InfluxDB.
 | Tag    | steam_id           | Player's Steam ID                    |
 | Tag    | player_name        | Player name (from minqlx Redis)      |
 | Tag    | player_ip          | Player's IP address                  |
-| Tag    | rate_setting       | Engine rate for this experiment       |
+| Tag    | rate_setting       | Engine rate (25k or 99k)             |
 | Field  | total_packets      | Packets sent to this player          |
 | Field  | fragmented_packets | Fragmented packets to this player    |
 | Field  | avg_size           | Avg payload size to this player      |
@@ -134,4 +125,4 @@ Every 10 seconds, flush aggregated data to InfluxDB.
 | tcpdump (BPF) | ~1-5μs     | ~0.5-1.6ms/sec | None     |
 | scapy  | ~50-100μs         | ~16-32ms/sec | None        |
 
-All methods are negligible at this packet rate. tcpdump chosen for simplicity.
+All methods are negligible at this packet rate. eBPF chosen for in-kernel aggregation and zero userspace copies. Kernel version is frozen to avoid verifier compatibility issues.

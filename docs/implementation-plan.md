@@ -5,8 +5,8 @@
 **Goal:** Validate that we can capture QL packet sizes and that fragmentation occurs at 99k rate.
 
 ### Deliverables
-- Python script that runs tcpdump on a specified port range
-- Parses packet lengths in real-time
+- eBPF program (C) that captures outbound UDP packet metadata on QL ports
+- Python userspace script that reads BPF maps every 10 seconds
 - Every 10 seconds prints to terminal:
   - Histogram of packet sizes (bucketed)
   - Fragmentation percentage
@@ -14,10 +14,10 @@
 
 ### Requirements
 - Python 3.8+
-- tcpdump (needs root/CAP_NET_RAW)
+- bcc or bpfcc-tools (eBPF toolchain)
+- Linux kernel with BPF support (frozen version)
+- Root/CAP_BPF + CAP_NET_ADMIN
 - Redis (optional, for player mapping)
-
-### No external Python dependencies for Phase 1 (stdlib only + redis-py)
 
 ---
 
@@ -47,7 +47,7 @@
   - Fragmentation % over time
   - Per-player fragmentation rates
   - Packet size distribution histogram
-  - Comparison view: 25k vs 50k vs 99k
+  - Comparison view: 25k vs 99k
 - Python script to export data as CSV for statistical analysis
 - Matplotlib/seaborn scripts for publication-quality charts
 
@@ -59,7 +59,7 @@
 
 ### Experiment Design
 1. Same 8 players, same map (e.g., campgrounds), same mode (CA)
-2. Run N rounds at each rate setting: 25k, 50k, 75k, 99k
+2. Run N rounds at each rate setting: 25k, 99k
 3. Capture packet data + player subjective feedback
 4. Compare distributions across settings
 
