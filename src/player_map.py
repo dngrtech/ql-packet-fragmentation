@@ -1,42 +1,90 @@
 # src/player_map.py
-"""Redis-based player IP mapping using minqlx data."""
+"""Player mapping via rcon status — transient, in-memory only. No IPs stored."""
 
 import re
+import socket
 import time
 from typing import Dict, Optional, Tuple
 
 import redis
 
-# Refresh interval for the reverse index
-REFRESH_INTERVAL = 60
+REFRESH_INTERVAL = 30  # seconds — rcon on every interval for accuracy
 
-PlayerMap = Dict[str, Tuple[str, str]]  # {ip: (steamid, name)}
+PlayerMap = Dict[int, Tuple[str, str]]  # {qport: (steamid, name)}
 
-STEAMID_PATTERN = re.compile(rb"minqlx:players:(\d+):ips")
+# rcon status line: name  score  127.0.0.1:port  ping  rate  steamid
+_STATUS_RE = re.compile(
+    r"^(.+?)\s+\d+\s+127\.0\.0\.1:(\d+)\s+\d+\s+\d+\s+(\d{17})\s*$"
+)
+
+RCON_HEADER = b"\xff\xff\xff\xff"
 
 
-def build_reverse_index(r: redis.Redis) -> PlayerMap:
-    """Scan minqlx Redis keys and build {ip: (steamid, name)} mapping."""
+def _rcon_status(host: str, port: int, password: str, timeout: float = 2.0) -> str:
+    """Send rcon status to QL server, return response string."""
+    cmd = RCON_HEADER + f"rcon {password} status\n".encode()
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.settimeout(timeout)
+    try:
+        sock.sendto(cmd, (host, port))
+        data, _ = sock.recvfrom(4096)
+        # Strip header: \xff\xff\xff\xffprint\n
+        return data[len(RCON_HEADER):].decode(errors="replace").lstrip("print\n")
+    except (socket.timeout, OSError):
+        return ""
+    finally:
+        sock.close()
+
+
+def _parse_status(status: str) -> Dict[int, Tuple[str, str]]:
+    """Parse rcon status output into {qport: (steamid, name)}."""
     result: PlayerMap = {}
-
-    for key in r.scan_iter(match=b"minqlx:players:*:ips"):
-        m = STEAMID_PATTERN.match(key)
-        if not m:
-            continue
-        steamid = m.group(1).decode()
-        name_bytes = r.lindex(b"minqlx:players:" + m.group(1), 0)
-        name = name_bytes.decode() if name_bytes else "unknown"
-        ips = r.smembers(key)
-        for ip_bytes in ips:
-            result[ip_bytes.decode()] = (steamid, name)
-
+    for line in status.splitlines():
+        m = _STATUS_RE.match(line.strip())
+        if m:
+            name = m.group(1).strip()
+            qport = int(m.group(2))
+            steamid = m.group(3)
+            result[qport] = (steamid, name)
     return result
 
 
-class PlayerMapper:
-    """Manages periodic refresh of the IP -> player reverse index."""
+def _lookup_name(r: redis.Redis, steamid: str) -> str:
+    """Get player display name from Redis by steamid."""
+    name_bytes = r.lindex(f"minqlx:players:{steamid}", 0)
+    return name_bytes.decode(errors="replace") if name_bytes else steamid
 
-    def __init__(self, redis_url: Optional[str] = None):
+
+def build_player_map(
+    rcon_host: str, rcon_port: int, rcon_password: str,
+    redis_client: Optional[redis.Redis],
+) -> PlayerMap:
+    """Build transient {qport: (steamid, name)} from rcon status + Redis name lookup."""
+    status = _rcon_status(rcon_host, rcon_port, rcon_password)
+    players = _parse_status(status)
+
+    if redis_client:
+        # Freshen names from Redis (rcon name may have color codes stripped differently)
+        for qport, (steamid, _) in players.items():
+            name = _lookup_name(redis_client, steamid)
+            players[qport] = (steamid, name)
+
+    return players
+
+
+class PlayerMapper:
+    """Manages periodic refresh of the qport -> player mapping."""
+
+    def __init__(
+        self,
+        rcon_host: str,
+        rcon_port: int,
+        rcon_password: Optional[str],
+        redis_url: Optional[str] = None,
+    ):
+        self._rcon_host = rcon_host
+        self._rcon_port = rcon_port
+        self._rcon_password = rcon_password
         self._map: PlayerMap = {}
         self._redis: Optional[redis.Redis] = None
         self._last_refresh: float = 0
@@ -45,19 +93,20 @@ class PlayerMapper:
             self._redis = redis.from_url(redis_url)
 
     def refresh(self) -> None:
-        """Rebuild the reverse index from Redis."""
-        if self._redis is None:
+        """Rebuild the player map from rcon status."""
+        if not self._rcon_password:
             return
-        self._map = build_reverse_index(self._redis)
+        self._map = build_player_map(
+            self._rcon_host, self._rcon_port, self._rcon_password, self._redis
+        )
         self._last_refresh = time.monotonic()
 
     def maybe_refresh(self) -> None:
         """Refresh if REFRESH_INTERVAL has elapsed."""
-        if self._redis is None:
+        if not self._rcon_password:
             return
         if time.monotonic() - self._last_refresh >= REFRESH_INTERVAL:
             self.refresh()
 
     def get_map(self) -> PlayerMap:
-        """Return current IP -> (steamid, name) mapping."""
         return self._map

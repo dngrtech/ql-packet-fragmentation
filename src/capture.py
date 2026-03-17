@@ -1,8 +1,6 @@
 # src/capture.py
 """BCC-based eBPF loader and map reader for packet capture."""
 
-import socket
-import struct
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -11,16 +9,7 @@ from pyroute2 import IPRoute
 
 BPF_SOURCE = Path(__file__).parent / "bpf_program.c"
 
-IpData = Dict[str, List[Tuple[int, int]]]  # {ip_str: [(size, count), ...]}
-
-
-def _int_to_ip(addr: int) -> str:
-    """Convert a raw u32 from BPF map to dotted IP string.
-
-    BPF stores ip->daddr in network byte order. BCC reads it as a
-    native-endian ctypes u32, so we use native pack format.
-    """
-    return socket.inet_ntoa(struct.pack("I", addr))
+PortData = Dict[int, List[Tuple[int, int]]]  # {qport: [(size, count), ...]}
 
 
 class PacketCapture:
@@ -44,7 +33,6 @@ class PacketCapture:
         )
         fn = self._bpf.load_func("classify", BPF.SCHED_CLS)
 
-        # Attach to TC egress using pyroute2
         self._ipr = IPRoute()
         self._ifindex = self._ipr.link_lookup(ifname=self.interface)[0]
 
@@ -62,28 +50,28 @@ class PacketCapture:
             direct_action=True,
         )
 
-    def read_and_clear(self) -> IpData:
+    def read_and_clear(self) -> PortData:
         """Read all entries from the packet_counts map and clear it.
 
         Returns:
-            Dict mapping dest IP string to list of (udp_payload_size, count) tuples.
+            Dict mapping client qport to list of (udp_payload_size, count) tuples.
         """
         if self._bpf is None:
             return {}
 
         table = self._bpf["packet_counts"]
-        ip_data: IpData = {}
+        port_data: PortData = {}
 
         for key, val in table.items():
-            ip = _int_to_ip(key.dest_ip)
+            qport = key.dest_port
             size = key.size_bucket
             count = val.value
-            if ip not in ip_data:
-                ip_data[ip] = []
-            ip_data[ip].append((size, count))
+            if qport not in port_data:
+                port_data[qport] = []
+            port_data[qport].append((size, count))
 
         table.clear()
-        return ip_data
+        return port_data
 
     def stop(self) -> None:
         """Detach TC filter and clean up."""

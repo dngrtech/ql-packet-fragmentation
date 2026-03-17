@@ -18,8 +18,8 @@ def parse_args():
     )
     parser.add_argument(
         "--interface", "-i",
-        default="eth0",
-        help="Network interface to attach eBPF program to (default: eth0)",
+        default="lo",
+        help="Network interface to attach eBPF program to (default: lo)",
     )
     parser.add_argument(
         "--ports",
@@ -33,9 +33,19 @@ def parse_args():
         help="Aggregation interval in seconds (default: 10)",
     )
     parser.add_argument(
+        "--rcon-password",
+        default=None,
+        help="QL server rcon password for player identification",
+    )
+    parser.add_argument(
+        "--rcon-host",
+        default="127.0.0.1",
+        help="QL server host for rcon (default: 127.0.0.1)",
+    )
+    parser.add_argument(
         "--redis-url",
         default=None,
-        help="Redis URL for player mapping (optional, e.g. redis://localhost:6379/0)",
+        help="Redis URL for player name lookup (e.g. redis://localhost:6379/3)",
     )
     parser.add_argument(
         "--rate-setting",
@@ -47,7 +57,7 @@ def parse_args():
 
 
 def parse_port_range(port_str: str):
-    """Parse 'min-max' into (min, max) ints."""
+    """Parse 'min-max' or 'port' into (min, max) ints."""
     try:
         parts = port_str.split("-")
         if len(parts) == 2:
@@ -68,13 +78,12 @@ def main():
 
     port_min, port_max = parse_port_range(args.ports)
 
-    print(f"QL Packet Fragmentation Capture (eBPF)")
+    print("QL Packet Fragmentation Capture (eBPF)")
     print(f"Interface: {args.interface}  Ports: {port_min}-{port_max}  Interval: {args.interval}s")
     if args.rate_setting:
         print(f"Rate setting: {args.rate_setting}")
     print()
 
-    # Set up signal handler for clean shutdown
     def handle_signal(signum, frame):
         global running
         running = False
@@ -82,9 +91,13 @@ def main():
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGTERM, handle_signal)
 
-    # Initialize components
     capture = PacketCapture(args.interface, port_min, port_max)
-    player_mapper = PlayerMapper(redis_url=args.redis_url)
+    player_mapper = PlayerMapper(
+        rcon_host=args.rcon_host,
+        rcon_port=port_min,
+        rcon_password=args.rcon_password,
+        redis_url=args.redis_url,
+    )
 
     try:
         capture.start()
@@ -95,8 +108,8 @@ def main():
             time.sleep(args.interval)
 
             player_mapper.maybe_refresh()
-            ip_data = capture.read_and_clear()
-            stats = aggregate_packets(ip_data)
+            port_data = capture.read_and_clear()
+            stats = aggregate_packets(port_data)
             output = format_stats(
                 stats,
                 player_map=player_mapper.get_map(),

@@ -21,7 +21,7 @@ def format_histogram_bar(count: int, total: int, width: int = 40) -> str:
 
 def format_stats(
     stats: dict,
-    player_map: Optional[Dict[str, Tuple[str, str]]] = None,
+    player_map: Optional[Dict[int, Tuple[str, str]]] = None,
     rate_setting: Optional[str] = None,
     timestamp: Optional[str] = None,
 ) -> str:
@@ -29,7 +29,7 @@ def format_stats(
 
     Args:
         stats: Output from aggregate_packets().
-        player_map: Optional {ip: (steamid, name)} for per-player display.
+        player_map: Optional {qport: (steamid, name)} for per-player display.
         rate_setting: Optional rate label (e.g. "99k").
         timestamp: Optional timestamp string (defaults to current time).
     """
@@ -58,23 +58,23 @@ def format_stats(
         bar = format_histogram_bar(count, total)
         lines.append(f"  {label}  {count:>6}  {pct:>5.1f}%  {bar}")
 
-    # Per-player breakdown
-    if stats.get("per_ip") and player_map:
+    # Per-player breakdown keyed by qport → (steamid, name)
+    if stats.get("per_port") and player_map:
         lines.append("")
         lines.append("  Per-Player Breakdown:")
-        lines.append(f"  {'Player':<20} {'Pkts':>6} {'Frag':>6} {'Frag%':>7} {'Avg':>6} {'Max':>6}")
-        lines.append("  " + "-" * 60)
-        for ip, ip_stats in sorted(stats["per_ip"].items()):
-            if ip in player_map:
-                _, name = player_map[ip]
+        lines.append(f"  {'Player':<22} {'SteamID':>17} {'Pkts':>6} {'Frag':>6} {'Frag%':>7} {'Avg':>6} {'Max':>6}")
+        lines.append("  " + "-" * 72)
+        for qport, port_stats in sorted(stats["per_port"].items()):
+            if qport in player_map:
+                steamid, name = player_map[qport]
             else:
-                name = ip
-            ip_total = ip_stats["total_packets"]
-            ip_frag = ip_stats["fragmented_packets"]
-            ip_frag_pct = (ip_frag / ip_total) * 100 if ip_total else 0
+                name, steamid = f"port:{qport}", ""
+            p_total = port_stats["total_packets"]
+            p_frag = port_stats["fragmented_packets"]
+            p_frag_pct = (p_frag / p_total) * 100 if p_total else 0
             lines.append(
-                f"  {name:<20} {ip_total:>6} {ip_frag:>6} {ip_frag_pct:>6.1f}% "
-                f"{ip_stats['avg_size']:>5.0f}B {ip_stats['max_size']:>5}B"
+                f"  {name:<22} {steamid:>17} {p_total:>6} {p_frag:>6} {p_frag_pct:>6.1f}% "
+                f"{port_stats['avg_size']:>5.0f}B {port_stats['max_size']:>5}B"
             )
 
     return "\n".join(lines)

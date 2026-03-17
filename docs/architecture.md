@@ -70,17 +70,12 @@ Every 10 seconds, the aggregator computes per-port and per-player stats:
 - Max packet size
 - Histogram buckets: [0-500, 500-1000, 1000-1472, 1472+]
 
-### 3. Player Mapping (Redis → Python)
+### 3. Player Mapping (rcon + Redis → Python, transient)
 
-At capture start and every 60 seconds, query minqlx Redis:
-
-```
-minqlx:players:<steamid>          → list  (player name at index 0)
-minqlx:players:<steamid>:ips      → set   (IP addresses)
-minqlx:players:<steamid>:last_seen → string (timestamp)
-```
-
-Build reverse index: `{ip: (steamid, player_name)}`
+At each interval, send rcon `status` to the QL server to get currently connected players
+and their session IPs. Build a transient in-memory map `{ip: (steamid, player_name)}`.
+Look up each steamid's display name from Redis (`minqlx:players:<steamid>` LINDEX 0).
+Discard the IP mapping after the interval — IPs are never stored anywhere.
 
 ### 4. InfluxDB Write
 
@@ -110,7 +105,6 @@ Every 10 seconds, flush aggregated data to InfluxDB.
 | Tag    | server_port        | QL server port                       |
 | Tag    | steam_id           | Player's Steam ID                    |
 | Tag    | player_name        | Player name (from minqlx Redis)      |
-| Tag    | player_ip          | Player's IP address                  |
 | Tag    | rate_setting       | Engine rate (25k or 99k)             |
 | Field  | total_packets      | Packets sent to this player          |
 | Field  | fragmented_packets | Fragmented packets to this player    |

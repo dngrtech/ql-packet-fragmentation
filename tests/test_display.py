@@ -29,11 +29,11 @@ class TestFormatStats:
             "avg_size": 800.5,
             "max_size": 1600,
             "buckets": [40, 30, 20, 10],
-            "per_ip": {},
+            "per_port": {},
         }
         output = format_stats(stats)
         assert "100" in output
-        assert "10.0%" in output  # frag percentage
+        assert "10.0%" in output
         assert "800" in output
         assert "1600" in output
 
@@ -44,7 +44,7 @@ class TestFormatStats:
             "avg_size": 0.0,
             "max_size": 0,
             "buckets": [0, 0, 0, 0],
-            "per_ip": {},
+            "per_port": {},
         }
         output = format_stats(stats)
         assert "0" in output
@@ -57,8 +57,8 @@ class TestFormatStats:
             "avg_size": 1000.0,
             "max_size": 1500,
             "buckets": [0, 5, 3, 2],
-            "per_ip": {
-                "10.0.0.1": {
+            "per_port": {
+                56650: {
                     "total_packets": 10,
                     "fragmented_packets": 2,
                     "avg_size": 1000.0,
@@ -66,7 +66,8 @@ class TestFormatStats:
                 },
             },
         }
-        player_map = {"10.0.0.1": ("76561197960700239", "testplayer")}
+        player_map = {56650: ("76561197960700239", "testplayer")}
         output = format_stats(stats, player_map=player_map)
         assert "testplayer" in output
-        assert "20.0%" in output  # per-player frag %
+        assert "76561197960700239" in output
+        assert "20.0%" in output

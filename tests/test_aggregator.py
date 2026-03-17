@@ -15,9 +15,9 @@ class TestAggregatePackets:
         assert result["buckets"] == [0, 0, 0, 0]
 
     def test_single_small_packet(self):
-        # ip_data: {dest_ip: [(size, count), ...]}
-        ip_data = {"10.0.0.1": [(400, 5)]}
-        result = aggregate_packets(ip_data)
+        # port_data: {qport: [(size, count), ...]}
+        port_data = {56650: [(400, 5)]}
+        result = aggregate_packets(port_data)
         assert result["total_packets"] == 5
         assert result["fragmented_packets"] == 0
         assert result["avg_size"] == 400.0
@@ -25,8 +25,8 @@ class TestAggregatePackets:
         assert result["buckets"] == [5, 0, 0, 0]
 
     def test_fragmented_packets(self):
-        ip_data = {"10.0.0.1": [(1500, 3)]}
-        result = aggregate_packets(ip_data)
+        port_data = {56650: [(1500, 3)]}
+        result = aggregate_packets(port_data)
         assert result["total_packets"] == 3
         assert result["fragmented_packets"] == 3
         assert result["avg_size"] == 1500.0
@@ -34,24 +34,24 @@ class TestAggregatePackets:
         assert result["buckets"] == [0, 0, 0, 3]
 
     def test_boundary_exactly_1472(self):
-        ip_data = {"10.0.0.1": [(FRAG_THRESHOLD, 1)]}
-        result = aggregate_packets(ip_data)
+        port_data = {56650: [(FRAG_THRESHOLD, 1)]}
+        result = aggregate_packets(port_data)
         # Exactly 1472 is NOT fragmented (fits in one MTU)
         assert result["fragmented_packets"] == 0
         assert result["buckets"] == [0, 0, 1, 0]
 
     def test_boundary_1473(self):
-        ip_data = {"10.0.0.1": [(1473, 1)]}
-        result = aggregate_packets(ip_data)
+        port_data = {56650: [(1473, 1)]}
+        result = aggregate_packets(port_data)
         assert result["fragmented_packets"] == 1
         assert result["buckets"] == [0, 0, 0, 1]
 
-    def test_multiple_ips_mixed(self):
-        ip_data = {
-            "10.0.0.1": [(200, 10), (800, 5)],
-            "10.0.0.2": [(1200, 3), (1500, 2)],
+    def test_multiple_ports_mixed(self):
+        port_data = {
+            56650: [(200, 10), (800, 5)],
+            56651: [(1200, 3), (1500, 2)],
         }
-        result = aggregate_packets(ip_data)
+        result = aggregate_packets(port_data)
         assert result["total_packets"] == 20
         assert result["fragmented_packets"] == 2
         # avg = (200*10 + 800*5 + 1200*3 + 1500*2) / 20 = (2000+4000+3600+3000)/20 = 630
@@ -59,14 +59,14 @@ class TestAggregatePackets:
         assert result["max_size"] == 1500
         assert result["buckets"] == [10, 5, 3, 2]
 
-    def test_per_ip_breakdown(self):
-        ip_data = {
-            "10.0.0.1": [(400, 5)],
-            "10.0.0.2": [(1500, 3)],
+    def test_per_port_breakdown(self):
+        port_data = {
+            56650: [(400, 5)],
+            56651: [(1500, 3)],
         }
-        result = aggregate_packets(ip_data)
-        per_ip = result["per_ip"]
-        assert per_ip["10.0.0.1"]["total_packets"] == 5
-        assert per_ip["10.0.0.1"]["fragmented_packets"] == 0
-        assert per_ip["10.0.0.2"]["total_packets"] == 3
-        assert per_ip["10.0.0.2"]["fragmented_packets"] == 3
+        result = aggregate_packets(port_data)
+        per_port = result["per_port"]
+        assert per_port[56650]["total_packets"] == 5
+        assert per_port[56650]["fragmented_packets"] == 0
+        assert per_port[56651]["total_packets"] == 3
+        assert per_port[56651]["fragmented_packets"] == 3
