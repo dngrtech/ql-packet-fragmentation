@@ -78,6 +78,9 @@ When InfluxDB is enabled, each interval writes:
 Deployment details for the current containerized setup are in
 [`docs/influxdb-deployment.md`](docs/influxdb-deployment.md).
 
+For a full end-to-end deployment on another host, use
+[`docs/deployment-guide.md`](docs/deployment-guide.md).
+
 Output (every 10 seconds):
 
 ```

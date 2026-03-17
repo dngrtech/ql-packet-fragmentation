@@ -3,6 +3,9 @@
 This project writes interval summaries to InfluxDB 2.x when the collector is
 started with the `--influx-*` flags.
 
+For the full host deployment flow, including package install, plugin rollout,
+systemd, and verification, see [`docs/deployment-guide.md`](deployment-guide.md).
+
 ## Container Model
 
 The current deployment uses a Docker container on the Quake Live host with:
