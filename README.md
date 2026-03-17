@@ -103,10 +103,10 @@ Output (every 10 seconds):
 - [x] Phase 1 — eBPF capture + terminal output
   - TC egress capture on the real egress interface (`enp1s0` on the current host)
   - Per-player correlation via `minqlx:server_status:<port>` -> `udp_port`
-- [ ] Phase 2 — InfluxDB persistence + systemd service
+- [x] Phase 2 — InfluxDB persistence + systemd service
   - InfluxDB write path is implemented
   - Docker-hosted InfluxDB and a systemd collector service are deployed
-  - retention policy and operational hardening remain
+  - retention policy and operational hardening remain follow-up work
 - [ ] Phase 3 — Grafana dashboards + publication charts
 - [ ] Phase 4 — Controlled 25k vs 99k experiments
 

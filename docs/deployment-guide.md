@@ -60,11 +60,14 @@ Install the OS packages used by the collector and container deployment:
 ```bash
 sudo apt-get update
 sudo apt-get install -y \
+  curl \
+  openssl \
   python3-venv \
   python3-bpfcc \
   bpfcc-tools \
   redis-server \
-  docker.io
+  docker.io \
+  iptables-persistent
 ```
 
 Verify the Python modules:
@@ -214,6 +217,10 @@ sudo iptables -C INPUT -p tcp -s "$INFLUX_ALLOWLIST_IP" --dport 8086 -j ACCEPT 2
   sudo iptables -I INPUT 4 -p tcp -s "$INFLUX_ALLOWLIST_IP" --dport 8086 -j ACCEPT
 sudo netfilter-persistent save
 ```
+
+If `iptables-persistent` prompts during install on a fresh host, it is safe to
+accept the current rules and then save again after adding the `8086` allowlist
+rule above.
 
 Why host networking:
 
