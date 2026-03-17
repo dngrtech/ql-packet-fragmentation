@@ -18,8 +18,8 @@ def parse_args():
     )
     parser.add_argument(
         "--interface", "-i",
-        default="lo",
-        help="Network interface to attach eBPF program to (default: lo)",
+        default="enp1s0",
+        help="Network interface to attach eBPF program to (default: enp1s0)",
     )
     parser.add_argument(
         "--ports",

@@ -1,8 +1,9 @@
 /* src/bpf_program.c
  *
  * eBPF TC egress classifier for Quake Live packet size capture.
- * Runs on the loopback interface (lo) — all QL→client traffic is routed
- * through loopback due to SNAT (99k LAN rate setup).
+ * Runs on the egress interface (enp1s0). Although SNAT makes the QL process
+ * communicate via loopback, conntrack reverse-DNATs reply packets back to the
+ * real client IP before they reach lo — so all QL→client egress exits on enp1s0.
  *
  * Filters outbound UDP packets where source port is in the configured QL
  * server port range, records (dest_port, packet_size) into a BPF hash map.

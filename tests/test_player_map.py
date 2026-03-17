@@ -15,15 +15,15 @@ class TestBuildPlayerMap:
 
     def test_single_real_player(self):
         r = self._make_redis([
-            {"name": "rage^7", "steam": "76561199795317792", "qport": 20725, "team": "spectator"},
+            {"name": "rage^7", "steam": "76561199795317792", "udp_port": 20725, "team": "spectator"},
         ])
         result = build_player_map(r, 27962)
         assert result == {20725: ("76561199795317792", "rage")}
 
     def test_bots_excluded(self):
         r = self._make_redis([
-            {"name": "Bot^7", "steam": "90071996842377216", "qport": -1, "team": "red"},
-            {"name": "rage^7", "steam": "76561199795317792", "qport": 20725, "team": "spectator"},
+            {"name": "Bot^7", "steam": "90071996842377216", "udp_port": -1, "team": "red"},
+            {"name": "rage^7", "steam": "76561199795317792", "udp_port": 20725, "team": "spectator"},
         ])
         result = build_player_map(r, 27962)
         assert len(result) == 1
@@ -32,7 +32,7 @@ class TestBuildPlayerMap:
 
     def test_color_codes_stripped(self):
         r = self._make_redis([
-            {"name": "^1A^2n^3a^4r^5k^6i^7", "steam": "76561198000000001", "qport": 12345, "team": "red"},
+            {"name": "^1A^2n^3a^4r^5k^6i^7", "steam": "76561198000000001", "udp_port": 12345, "team": "red"},
         ])
         result = build_player_map(r, 27962)
         assert result[12345][1] == "Anarki"
@@ -45,9 +45,9 @@ class TestBuildPlayerMap:
 
     def test_multiple_real_players(self):
         r = self._make_redis([
-            {"name": "rage^7", "steam": "76561199795317792", "qport": 20725, "team": "spectator"},
-            {"name": "rin^7",  "steam": "76561198771411283", "qport": 56650, "team": "red"},
-            {"name": "Bot^7",  "steam": "90071996842377216", "qport": -1,    "team": "blue"},
+            {"name": "rage^7", "steam": "76561199795317792", "udp_port": 20725, "team": "spectator"},
+            {"name": "rin^7",  "steam": "76561198771411283", "udp_port": 56650, "team": "red"},
+            {"name": "Bot^7",  "steam": "90071996842377216", "udp_port": -1,    "team": "blue"},
         ])
         result = build_player_map(r, 27962)
         assert len(result) == 2

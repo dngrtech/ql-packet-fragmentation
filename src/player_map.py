@@ -36,8 +36,8 @@ def build_player_map(r: redis.Redis, port: int) -> PlayerMap:
 
     result: PlayerMap = {}
     for p in status.get("players", []):
-        qport = p.get("qport", -1)
-        if qport is None or qport < 0:
+        qport = p.get("udp_port")
+        if not qport or qport < 0:
             continue  # bot or unknown
         steamid = str(p.get("steam", ""))
         name = _strip_colors(p.get("name", steamid))

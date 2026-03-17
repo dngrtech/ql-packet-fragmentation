@@ -225,7 +225,7 @@ class serverchecker(minqlx.Plugin):
                         "score": p.score if hasattr(p, "score") else 0,
                         "ping":  p.ping  if hasattr(p, "ping")  else 0,
                         "team":  str(p.team),
-                        "qport": p.qport if hasattr(p, "qport") else None,
+                        "udp_port": int(p.ip.split(":")[1]) if p.ip and ":" in p.ip else None,
                     })
                 except Exception as pe:
                     self.logger.warning(f"serverchecker: player error: {pe}")
