@@ -12,6 +12,7 @@
 #include <uapi/linux/ip.h>
 #include <uapi/linux/udp.h>
 #include <uapi/linux/pkt_cls.h>
+#include <uapi/linux/in.h>
 
 /* PORT_MIN and PORT_MAX are injected by Python via BCC cflags:
  *   -DPORT_MIN=27960 -DPORT_MAX=27963

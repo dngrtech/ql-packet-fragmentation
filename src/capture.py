@@ -56,7 +56,7 @@ class PacketCapture:
         self._ipr.tc(
             "add-filter", "bpf", self._ifindex,
             fd=fn.fd, name=fn.name,
-            parent=0xFFF0FFF3,  # TC_H_CLSACT | TC_H_MIN_EGRESS
+            parent=0xFFFFFFF3,  # TC_H_CLSACT | TC_H_MIN_EGRESS
             prio=1,
             classid=1,
             direct_action=True,
