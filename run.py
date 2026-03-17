@@ -2,7 +2,14 @@
 """Entry point for QL packet fragmentation capture."""
 
 import argparse
+import signal
 import sys
+import time
+
+from src.aggregator import aggregate_packets
+from src.capture import PacketCapture
+from src.display import format_stats
+from src.player_map import PlayerMapper
 
 
 def parse_args():
@@ -39,15 +46,69 @@ def parse_args():
     return parser.parse_args()
 
 
+def parse_port_range(port_str: str):
+    """Parse 'min-max' into (min, max) ints."""
+    try:
+        parts = port_str.split("-")
+        if len(parts) == 2:
+            return int(parts[0]), int(parts[1])
+        port = int(parts[0])
+        return port, port
+    except ValueError:
+        print(f"Error: invalid port range '{port_str}' (expected e.g. 27960-27963)", file=sys.stderr)
+        sys.exit(1)
+
+
+running = True
+
+
 def main():
+    global running
     args = parse_args()
-    print(f"QL Packet Fragmentation Capture")
-    print(f"Interface: {args.interface}")
-    print(f"Ports: {args.ports}")
-    print(f"Interval: {args.interval}s")
-    print(f"Redis: {args.redis_url or 'disabled'}")
-    print(f"Rate: {args.rate_setting or 'unlabeled'}")
-    print("(not yet implemented)")
+
+    port_min, port_max = parse_port_range(args.ports)
+
+    print(f"QL Packet Fragmentation Capture (eBPF)")
+    print(f"Interface: {args.interface}  Ports: {port_min}-{port_max}  Interval: {args.interval}s")
+    if args.rate_setting:
+        print(f"Rate setting: {args.rate_setting}")
+    print()
+
+    # Set up signal handler for clean shutdown
+    def handle_signal(signum, frame):
+        global running
+        running = False
+
+    signal.signal(signal.SIGINT, handle_signal)
+    signal.signal(signal.SIGTERM, handle_signal)
+
+    # Initialize components
+    capture = PacketCapture(args.interface, port_min, port_max)
+    player_mapper = PlayerMapper(redis_url=args.redis_url)
+
+    try:
+        capture.start()
+        print("eBPF program attached. Capturing...\n")
+        player_mapper.refresh()
+
+        while running:
+            time.sleep(args.interval)
+
+            player_mapper.maybe_refresh()
+            ip_data = capture.read_and_clear()
+            stats = aggregate_packets(ip_data)
+            output = format_stats(
+                stats,
+                player_map=player_mapper.get_map(),
+                rate_setting=args.rate_setting,
+            )
+            print(output)
+            print()
+
+    finally:
+        capture.stop()
+        print("\nCapture stopped.")
+
     return 0
 
 
