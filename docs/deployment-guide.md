@@ -253,11 +253,15 @@ chmod 600 '"$REPO_DIR"'/secrets/influxdb-token
 '
 ```
 
-Bind InfluxDB to localhost only:
+Bind InfluxDB to localhost and set explicit data paths (required — without
+these, the container ignores the volume mounts and writes to an internal path):
 
 ```bash
 sudo bash -c 'cat > /opt/influxdb/config/config.toml <<TOML
 http-bind-address = "127.0.0.1:8086"
+bolt-path = "/var/lib/influxdb2/influxd.bolt"
+sqlite-path = "/var/lib/influxdb2/influxd.sqlite"
+engine-path = "/var/lib/influxdb2/engine"
 TOML'
 ```
 

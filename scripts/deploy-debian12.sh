@@ -222,6 +222,9 @@ EOF
 
   cat > "${INFLUXDB_DIR}/config/config.toml" <<EOF
 http-bind-address = "127.0.0.1:8086"
+bolt-path = "/var/lib/influxdb2/influxd.bolt"
+sqlite-path = "/var/lib/influxdb2/influxd.sqlite"
+engine-path = "/var/lib/influxdb2/engine"
 EOF
 
   systemctl enable --now docker

@@ -30,11 +30,18 @@ InfluxDB is configured to listen only on localhost via
 ## Access Control
 
 InfluxDB binds to `127.0.0.1:8086` only. It is not accessible from the
-network. The bind address is set in `/opt/influxdb/config/config.toml`:
+network. The full config is in `/opt/influxdb/config/config.toml`:
 
 ```toml
 http-bind-address = "127.0.0.1:8086"
+bolt-path = "/var/lib/influxdb2/influxd.bolt"
+sqlite-path = "/var/lib/influxdb2/influxd.sqlite"
+engine-path = "/var/lib/influxdb2/engine"
 ```
+
+The explicit data paths are required. Without them, InfluxDB ignores the
+Docker volume mounts and writes to an internal default path, which causes
+data loss and setup failures on container restart.
 
 The collector writes to `http://127.0.0.1:8086` locally. No firewall rules are
 needed for InfluxDB access.
