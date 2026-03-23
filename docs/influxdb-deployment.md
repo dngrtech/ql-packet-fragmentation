@@ -12,30 +12,32 @@ The current deployment uses a Docker container on the Quake Live host with:
 
 - host networking
 - persistent bind mounts under `/opt/influxdb`
-- the InfluxDB HTTP API bound on port `8086`
+- the InfluxDB HTTP API bound to `127.0.0.1:8086`
 
-Host networking is intentional. It keeps port `8086` under the normal host
-`iptables` INPUT chain instead of Docker's forwarded-port rules.
+Host networking is used so the container shares the host's network namespace.
+InfluxDB is configured to listen only on localhost via
+`/opt/influxdb/config/config.toml`.
 
 ## Persistent Paths
 
-- `/opt/influxdb/data`
-- `/opt/influxdb/config`
-- `/opt/influxdb/influxdb.env`
-- `/opt/influxdb/credentials.txt`
+- `/opt/influxdb/data` — database storage
+- `/opt/influxdb/config` — mounted as `/etc/influxdb2` in the container
+- `/opt/influxdb/config/config.toml` — bind address and other overrides
+- `/opt/influxdb/influxdb.env` — bootstrap credentials (first run only)
+- `/opt/influxdb/credentials.txt` — admin username/password/token reference
 - `/opt/ql-packet-fragmentation/secrets/influxdb-token`
 
 ## Access Control
 
-InfluxDB listens on `0.0.0.0:8086`, but host firewall rules restrict external
-access.
+InfluxDB binds to `127.0.0.1:8086` only. It is not accessible from the
+network. The bind address is set in `/opt/influxdb/config/config.toml`:
 
-Current allowlist:
+```toml
+http-bind-address = "127.0.0.1:8086"
+```
 
-- `154.20.139.212/32` -> TCP `8086`
-
-The collector itself writes to `http://127.0.0.1:8086`, so local ingestion does
-not depend on external firewall access.
+The collector writes to `http://127.0.0.1:8086` locally. No firewall rules are
+needed for InfluxDB access.
 
 ## Collector Flags
 

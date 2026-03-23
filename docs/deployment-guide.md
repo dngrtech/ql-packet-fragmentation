@@ -23,8 +23,6 @@ Set these first for the new server:
 export REPO_DIR=/opt/ql-packet-fragmentation
 export PORTS=27960-27962
 export INTERFACE=enp1s0
-export RATE_SETTING=99k
-export INFLUX_ALLOWLIST_IP=154.20.139.212
 ```
 
 To discover the real egress interface:
@@ -82,7 +80,6 @@ curl -fsSL https://raw.githubusercontent.com/dngrtech/ql-packet-fragmentation/ma
   QL_COMMON_PLUGIN_DIR=/home/ql/assets/common/minqlx-plugins \
   QL_INSTANCE_PLUGIN_DIR_TEMPLATE=/home/ql/qlds-%s/minqlx-plugins \
   INSTALL_INFLUXDB=1 \
-  INFLUX_ALLOWLIST_IP=154.20.139.212 \
   bash
 ```
 
@@ -101,7 +98,7 @@ curl -fsSL https://raw.githubusercontent.com/dngrtech/ql-packet-fragmentation/ma
 | `RATE_SETTING_<port>` | *(empty)* | Per-port rate override (e.g. `RATE_SETTING_27960=99k`) |
 | `HOST_TAG` | *(empty)* | Host identifier for InfluxDB — set this to distinguish hosts |
 | `INSTALL_INFLUXDB` | `0` | Set to `1` to deploy InfluxDB in Docker |
-| `INFLUX_ALLOWLIST_IP` | *(empty)* | External IP to allow through firewall to InfluxDB |
+| `INFLUX_ALLOWLIST_IP` | *(empty)* | Deprecated — InfluxDB now binds to localhost only |
 | `INSTALL_SERVERCHECKER` | `0` | Set to `1` to deploy the minqlx plugin |
 | `QL_COMMON_PLUGIN_DIR` | *(empty)* | Shared minqlx plugin directory |
 | `QL_INSTANCE_PLUGIN_DIR_TEMPLATE` | *(empty)* | Per-instance plugin dir (printf template, `%s` = port) |
@@ -140,8 +137,7 @@ sudo apt-get install -y \
   bpfcc-tools \
   "linux-headers-$(uname -r)" \
   redis-server \
-  docker.io \
-  iptables-persistent
+  docker.io
 ```
 
 Verify the Python modules:
@@ -257,6 +253,14 @@ chmod 600 '"$REPO_DIR"'/secrets/influxdb-token
 '
 ```
 
+Bind InfluxDB to localhost only:
+
+```bash
+sudo bash -c 'cat > /opt/influxdb/config/config.toml <<TOML
+http-bind-address = "127.0.0.1:8086"
+TOML'
+```
+
 Start Docker and run the container:
 
 ```bash
@@ -282,25 +286,28 @@ for _ in $(seq 1 30); do
 done
 ```
 
-## 7. Lock Down InfluxDB with the Firewall
+## 7. Verify InfluxDB Is Localhost-Only
 
-Allow the external IP you want and persist the rule:
+Confirm InfluxDB is bound to `127.0.0.1` and not exposed to the network:
 
 ```bash
-sudo iptables -C INPUT -p tcp -s "$INFLUX_ALLOWLIST_IP" --dport 8086 -j ACCEPT 2>/dev/null || \
-  sudo iptables -I INPUT 4 -p tcp -s "$INFLUX_ALLOWLIST_IP" --dport 8086 -j ACCEPT
-sudo netfilter-persistent save
+sudo ss -tlnp | grep 8086
 ```
 
-If `iptables-persistent` prompts during install on a fresh host, it is safe to
-accept the current rules and then save again after adding the `8086` allowlist
-rule above.
+Expected output:
 
-Why host networking:
+```
+LISTEN  0  4096  127.0.0.1:8086  0.0.0.0:*  users:(("influxd",...))
+```
 
-- InfluxDB still listens on `*:8086`
-- access control stays in the normal host `iptables` INPUT chain
-- the collector writes locally to `127.0.0.1:8086`
+If it shows `*:8086` instead, ensure `/opt/influxdb/config/config.toml` contains
+`http-bind-address = "127.0.0.1:8086"` and restart the container:
+
+```bash
+sudo docker restart influxdb2
+```
+
+No firewall rules are needed for InfluxDB — localhost binding is sufficient.
 
 ## 8. Install and Configure the systemd Collector Service
 
@@ -402,6 +409,7 @@ sudo cat /etc/default/ql-packet-fragmentation
 ```bash
 sudo docker ps --filter name=influxdb2
 curl -fsS http://127.0.0.1:8086/health
+sudo ss -tlnp | grep 8086   # should show 127.0.0.1:8086, NOT *:8086
 ```
 
 Query recent data:
@@ -432,16 +440,10 @@ Restart InfluxDB:
 sudo docker restart influxdb2
 ```
 
-Check that port `8086` is listening:
+Check that port `8086` is listening on localhost:
 
 ```bash
 sudo ss -ltnp | grep 8086
-```
-
-Check the firewall rule:
-
-```bash
-sudo iptables -S INPUT | grep 8086
 ```
 
 ## 11. Updating an Existing Deployment

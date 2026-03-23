@@ -58,7 +58,7 @@ if [[ -z "$INTERFACE" ]]; then
 fi
 
 if [[ "$INSTALL_INFLUXDB" == "1" ]]; then
-  APT_PACKAGES+=" docker.io iptables-persistent"
+  APT_PACKAGES+=" docker.io"
 fi
 
 echo "Deploying ${SERVICE_NAME} to ${REPO_DIR}"
@@ -220,6 +220,10 @@ EOF
   printf '%s' "$INFLUXDB_TOKEN" > "$INFLUX_TOKEN_FILE"
   chmod 600 "$INFLUX_TOKEN_FILE"
 
+  cat > "${INFLUXDB_DIR}/config/config.toml" <<EOF
+http-bind-address = "127.0.0.1:8086"
+EOF
+
   systemctl enable --now docker
   docker rm -f "$INFLUX_CONTAINER_NAME" >/dev/null 2>&1 || true
   docker pull "$INFLUXDB_IMAGE"
@@ -238,12 +242,6 @@ EOF
     fi
     sleep 1
   done
-
-  if [[ -n "$INFLUX_ALLOWLIST_IP" ]]; then
-    iptables -C INPUT -p tcp -s "$INFLUX_ALLOWLIST_IP" --dport 8086 -j ACCEPT 2>/dev/null || \
-      iptables -I INPUT 4 -p tcp -s "$INFLUX_ALLOWLIST_IP" --dport 8086 -j ACCEPT
-    netfilter-persistent save
-  fi
 fi
 
 systemctl daemon-reload
