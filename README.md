@@ -130,18 +130,6 @@ Output (every 10 seconds):
   rage                     76561199795317792    102     21   20.6%  1187B  2104B
 ```
 
-## Project Status
-
-- [x] Phase 1 — eBPF capture + terminal output
-  - TC egress capture on the real egress interface (`enp1s0` on the current host)
-  - Per-player correlation via `minqlx:server_status:<port>` -> `udp_port`
-- [x] Phase 2 — InfluxDB persistence + systemd service
-  - InfluxDB write path is implemented
-  - Docker-hosted InfluxDB and a systemd collector service are deployed
-  - retention policy and operational hardening remain follow-up work
-- [ ] Phase 3 — Grafana dashboards + publication charts
-- [ ] Phase 4 — Controlled 25k vs 99k experiments
-
 ## License
 
 MIT
