@@ -46,7 +46,7 @@ sudo /opt/ql-packet-fragmentation/.venv/bin/python /opt/ql-packet-fragmentation/
   --interface enp1s0 \
   --ports 27960-27963 \
   --interval 10 \
-  --rate-setting 99k \
+  --rate-setting '27960:99k,27961:25k,27962:25k,27963:99k' \
   --host-tag texas \
   --redis-url redis://localhost:6379/3 \
   --influx-url http://127.0.0.1:8086 \
@@ -83,5 +83,5 @@ Tags written by the collector:
 
 - `host`
 - `server_port`
-- `rate_setting` when configured
+- `rate_setting` — per-port when configured (e.g. 27960 tagged `99k`, 27961 tagged `25k`)
 - `steam_id` and `player_name` for `player_packets`

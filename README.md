@@ -48,7 +48,7 @@ sudo python3 run.py \
   --interface enp1s0 \
   --ports 27960-27963 \
   --interval 10 \
-  --rate-setting 99k \
+  --rate-setting '27960:99k,27961:25k,27962:25k,27963:99k' \
   --host-tag texas \
   --redis-url redis://localhost:6379/3 \
   --influx-url http://127.0.0.1:8086 \
@@ -61,6 +61,9 @@ Notes:
 
 - `--ports` accepts a single QL port or a range.
 - In multi-port mode, the collector prints one report per server port.
+- `--rate-setting` accepts a single value (`99k`) applied to all ports, or a
+  per-port mapping (`27960:99k,27961:25k`). Servers on the same host often
+  differ — check `sv_lanForceRate` in each instance's process args.
 - When `--redis-url` is set for a range, its host/port/credentials are reused
   and the Redis DB index is derived from each server port (`27960 -> db1`,
   `27961 -> db2`, `27962 -> db3`, and so on).
@@ -101,7 +104,7 @@ InfluxDB tags include:
 
 - `host`
 - `server_port`
-- `rate_setting` when provided
+- `rate_setting` per-port when provided
 - `steam_id` and `player_name` for `player_packets`
 
 Deployment details for the current containerized setup are in

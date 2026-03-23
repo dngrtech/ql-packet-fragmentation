@@ -100,7 +100,7 @@ Tags:
 
 - `host`
 - `server_port`
-- `rate_setting` when supplied
+- `rate_setting` — per-port when configured (e.g. 27960 tagged `99k`, 27961 tagged `25k`)
 - `steam_id` and `player_name` on `player_packets`
 
 ## Planned Extensions
