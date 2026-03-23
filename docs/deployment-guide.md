@@ -37,8 +37,31 @@ Use the `dev ...` interface from that output.
 
 ## One-Shot Installer
 
-If you want a single non-interactive deployment command on Debian 12, the repo
-now includes [`scripts/deploy-debian12.sh`](../scripts/deploy-debian12.sh).
+The repo includes [`scripts/deploy-debian12.sh`](../scripts/deploy-debian12.sh)
+for single-command deployment. The script runs with `set -euo pipefail` — any
+step failure aborts the entire run. If it fails partway through, see
+[Troubleshooting](#troubleshooting) to identify what was and wasn't completed.
+
+### Running via SSH from a management host
+
+Typical pattern using an SSH key from the qlds-ui terraform directory:
+
+```bash
+sudo ssh -i /opt/qlds-ui/terraform/ssh-keys/<HOST_KEY> \
+  -o StrictHostKeyChecking=accept-new root@<SERVER_IP> \
+  'curl -fsSL https://raw.githubusercontent.com/dngrtech/ql-packet-fragmentation/main/scripts/deploy-debian12.sh | env \
+    REPO_GIT_URL=https://github.com/dngrtech/ql-packet-fragmentation.git \
+    PORTS=27960-27963 \
+    INTERFACE=eth0 \
+    REDIS_URL=redis://localhost:6379/3 \
+    HOST_TAG=<location> \
+    INSTALL_INFLUXDB=1 \
+    bash'
+```
+
+Note: when running via SSH as root, `sudo` is not needed inside the command.
+
+### Running directly on the target host
 
 Minimal collector-only install:
 
@@ -46,7 +69,7 @@ Minimal collector-only install:
 curl -fsSL https://raw.githubusercontent.com/dngrtech/ql-packet-fragmentation/main/scripts/deploy-debian12.sh | sudo env REPO_GIT_URL=https://github.com/dngrtech/ql-packet-fragmentation.git PORTS=27960-27962 INTERFACE=enp1s0 REDIS_URL=redis://localhost:6379/3 HOST_TAG=texas bash
 ```
 
-With plugin deployment and local InfluxDB:
+Full install with plugins, InfluxDB, and firewall allowlist:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/dngrtech/ql-packet-fragmentation/main/scripts/deploy-debian12.sh | sudo env \
@@ -62,6 +85,27 @@ curl -fsSL https://raw.githubusercontent.com/dngrtech/ql-packet-fragmentation/ma
   INFLUX_ALLOWLIST_IP=154.20.139.212 \
   bash
 ```
+
+### Installer Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `REPO_GIT_URL` | `https://github.com/dngrtech/ql-packet-fragmentation.git` | Git clone URL |
+| `REPO_REF` | *(latest main)* | Tag or commit to deploy |
+| `REPO_DIR` | `/opt/ql-packet-fragmentation` | Install directory |
+| `INTERFACE` | *(auto-detected)* | Network interface for eBPF capture |
+| `PORTS` | `27960-27963` | QL server port range |
+| `INTERVAL` | `10` | Capture interval in seconds |
+| `REDIS_URL` | `redis://localhost:6379/1` | Redis URL for player mapping |
+| `RATE_SETTING` | `99k` | QL rate setting tag for InfluxDB |
+| `HOST_TAG` | *(empty)* | Host identifier for InfluxDB — set this to distinguish hosts |
+| `INSTALL_INFLUXDB` | `0` | Set to `1` to deploy InfluxDB in Docker |
+| `INFLUX_ALLOWLIST_IP` | *(empty)* | External IP to allow through firewall to InfluxDB |
+| `INSTALL_SERVERCHECKER` | `0` | Set to `1` to deploy the minqlx plugin |
+| `QL_COMMON_PLUGIN_DIR` | *(empty)* | Shared minqlx plugin directory |
+| `QL_INSTANCE_PLUGIN_DIR_TEMPLATE` | *(empty)* | Per-instance plugin dir (printf template, `%s` = port) |
+| `RESTART_QLDS` | `0` | Set to `1` to restart QL instances after plugin deploy |
+| `SERVICE_NAME` | `ql-packet-fragmentation` | systemd service name |
 
 ## 1. Sync the Repository
 
@@ -310,22 +354,47 @@ sudo systemctl enable --now ql-packet-fragmentation.service
 
 ## 9. Verify the Deployment
 
-Service status:
+### Collector service
 
 ```bash
 sudo systemctl status ql-packet-fragmentation.service
 ```
 
-Live logs:
+A healthy service shows `active (running)` and the process command line should
+include the expected `--interface`, `--ports`, and `--host-tag` flags.
+
+Check the journal for the eBPF attach confirmation:
 
 ```bash
-sudo journalctl -u ql-packet-fragmentation.service -f
+sudo journalctl -u ql-packet-fragmentation.service -n 20 --no-pager
 ```
 
-You should see interval output with per-port summaries and per-player rows when
-real players are connected.
+You should see:
 
-Query InfluxDB locally:
+```
+QL Packet Fragmentation Capture (eBPF)
+Interface: eth0  Ports: 27960-27963  Interval: 10s
+eBPF program attached. Capturing...
+```
+
+If the service is crash-looping instead, see [Troubleshooting](#troubleshooting).
+
+### Env file
+
+Confirm the env file has the correct values for this host:
+
+```bash
+sudo cat /etc/default/ql-packet-fragmentation
+```
+
+### InfluxDB (if deployed)
+
+```bash
+sudo docker ps --filter name=influxdb2
+curl -fsS http://127.0.0.1:8086/health
+```
+
+Query recent data:
 
 ```bash
 token=$(grep '^token=' /opt/influxdb/credentials.txt | cut -d= -f2-)
@@ -336,17 +405,8 @@ sudo docker exec influxdb2 influx query \
   'from(bucket: "ql_packet_fragmentation") |> range(start: -10m) |> filter(fn: (r) => r._measurement == "packet_stats") |> last()'
 ```
 
-Open the UI from the allowlisted client:
-
-```text
-http://YOUR_SERVER_IP:8086
-```
-
-Login with the credentials in:
-
-```text
-/opt/influxdb/credentials.txt
-```
+Open the UI from the allowlisted client at `http://YOUR_SERVER_IP:8086`.
+Login credentials are in `/opt/influxdb/credentials.txt`.
 
 ## 10. Operational Commands
 
@@ -373,3 +433,81 @@ Check the firewall rule:
 ```bash
 sudo iptables -S INPUT | grep 8086
 ```
+
+## 11. Updating an Existing Deployment
+
+To update the collector code on a running server:
+
+```bash
+cd /opt/ql-packet-fragmentation
+git pull --ff-only origin main
+.venv/bin/pip install . --quiet
+sudo systemctl restart ql-packet-fragmentation.service
+```
+
+Via SSH from the management host:
+
+```bash
+sudo ssh -i /opt/qlds-ui/terraform/ssh-keys/<HOST_KEY> root@<SERVER_IP> \
+  'cd /opt/ql-packet-fragmentation && git pull --ff-only origin main && .venv/bin/pip install . --quiet && systemctl restart ql-packet-fragmentation.service && sleep 3 && systemctl status ql-packet-fragmentation.service'
+```
+
+## Troubleshooting
+
+Check the service journal for errors:
+
+```bash
+sudo journalctl -u ql-packet-fragmentation.service -n 30 --no-pager
+```
+
+### "Permission denied" (exit code 203/EXEC)
+
+The `run-service.sh` script is not executable:
+
+```bash
+sudo chmod 755 /opt/ql-packet-fragmentation/scripts/run-service.sh
+sudo systemctl restart ql-packet-fragmentation.service
+```
+
+### "Failed to compile BPF module" / "Unable to find kernel headers"
+
+Kernel headers are missing. BCC compiles eBPF programs at runtime and needs
+headers matching the running kernel:
+
+```bash
+sudo apt-get install -y "linux-headers-$(uname -r)"
+sudo systemctl restart ql-packet-fragmentation.service
+```
+
+### "failed to read secret file ... influxdb-token"
+
+The InfluxDB token file was not created. This happens when the one-shot
+installer fails before reaching the InfluxDB setup phase. Either re-run the
+installer or create the token manually:
+
+```bash
+sudo install -d -m 700 /opt/ql-packet-fragmentation/secrets
+token=$(grep '^token=' /opt/influxdb/credentials.txt | cut -d= -f2-)
+printf '%s' "$token" | sudo tee /opt/ql-packet-fragmentation/secrets/influxdb-token > /dev/null
+sudo chmod 600 /opt/ql-packet-fragmentation/secrets/influxdb-token
+sudo systemctl restart ql-packet-fragmentation.service
+```
+
+### One-shot installer failed partway through
+
+The script uses `set -e` so any command failure aborts the rest. Check what
+was completed:
+
+| Check | Command |
+|-------|---------|
+| Repo cloned? | `ls /opt/ql-packet-fragmentation/.git` |
+| Venv created? | `ls /opt/ql-packet-fragmentation/.venv/bin/python` |
+| Env file created? | `cat /etc/default/ql-packet-fragmentation` |
+| Systemd unit installed? | `cat /etc/systemd/system/ql-packet-fragmentation.service` |
+| InfluxDB running? | `docker ps --filter name=influxdb2` |
+| Token file exists? | `ls -la /opt/ql-packet-fragmentation/secrets/influxdb-token` |
+| Service running? | `systemctl status ql-packet-fragmentation.service` |
+
+Resume from the failed step using the manual instructions in this guide, or
+re-run the installer (it is safe to re-run — it will update an existing clone
+and overwrite config files).
