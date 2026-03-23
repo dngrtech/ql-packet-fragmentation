@@ -45,9 +45,12 @@ def parse_args():
     )
     parser.add_argument(
         "--rate-setting",
-        choices=["25k", "99k"],
         default=None,
-        help="Label for the current rate setting (for display only)",
+        help=(
+            "Rate setting label. Either a single value applied to all ports "
+            "(e.g. '99k') or a comma-separated per-port mapping "
+            "(e.g. '27960:99k,27961:25k')"
+        ),
     )
     parser.add_argument(
         "--host-tag",
@@ -95,6 +98,27 @@ def parse_port_range(port_str: str):
         sys.exit(1)
 
 
+def parse_rate_setting(raw: str | None, server_ports: list[int]) -> dict[int, str | None]:
+    """Parse rate setting into a per-port mapping.
+
+    Accepts:
+      - None                        -> {port: None, ...}
+      - "99k"                       -> {port: "99k", ...}  (all ports)
+      - "27960:99k,27961:25k,..."   -> per-port mapping
+    """
+    result = {port: None for port in server_ports}
+    if not raw:
+        return result
+    if ":" not in raw:
+        return {port: raw for port in server_ports}
+    for entry in raw.split(","):
+        port_str, _, rate = entry.partition(":")
+        port = int(port_str)
+        if port in result:
+            result[port] = rate
+    return result
+
+
 running = True
 
 
@@ -114,10 +138,17 @@ def main():
     port_min, port_max = parse_port_range(args.ports)
     server_ports = list(range(port_min, port_max + 1))
 
+    rate_map = parse_rate_setting(args.rate_setting, server_ports)
+
     print("QL Packet Fragmentation Capture (eBPF)")
     print(f"Interface: {args.interface}  Ports: {port_min}-{port_max}  Interval: {args.interval}s")
-    if args.rate_setting:
-        print(f"Rate setting: {args.rate_setting}")
+    rates_set = {v for v in rate_map.values() if v}
+    if rates_set:
+        if len(rates_set) == 1:
+            print(f"Rate setting: {rates_set.pop()}")
+        else:
+            parts = [f"{p}={r}" for p, r in sorted(rate_map.items()) if r]
+            print(f"Rate settings: {', '.join(parts)}")
     print()
 
     def handle_signal(signum, frame):
@@ -160,7 +191,7 @@ def main():
                     format_stats(
                         stats,
                         player_map=player_map,
-                        rate_setting=args.rate_setting,
+                        rate_setting=rate_map.get(server_port),
                         server_port=server_port if len(server_ports) > 1 else None,
                     )
                 )
@@ -168,7 +199,7 @@ def main():
                     server_port=server_port,
                     stats=stats,
                     player_map=player_map,
-                    rate_setting=args.rate_setting,
+                    rate_setting=rate_map.get(server_port),
                     timestamp_ns=timestamp_ns,
                 )
             print("\n\n".join(outputs))

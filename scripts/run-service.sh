@@ -16,7 +16,16 @@ if [[ -n "${REDIS_URL:-}" ]]; then
   cmd+=(--redis-url "$REDIS_URL")
 fi
 
-if [[ -n "${RATE_SETTING:-}" ]]; then
+# Collect per-port rate settings (RATE_SETTING_27960=99k, etc.)
+rate_map=""
+for var in $(compgen -v RATE_SETTING_); do
+  port="${var#RATE_SETTING_}"
+  rate_map+="${rate_map:+,}${port}:${!var}"
+done
+
+if [[ -n "$rate_map" ]]; then
+  cmd+=(--rate-setting "$rate_map")
+elif [[ -n "${RATE_SETTING:-}" ]]; then
   cmd+=(--rate-setting "$RATE_SETTING")
 fi
 

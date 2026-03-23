@@ -97,7 +97,8 @@ curl -fsSL https://raw.githubusercontent.com/dngrtech/ql-packet-fragmentation/ma
 | `PORTS` | `27960-27963` | QL server port range |
 | `INTERVAL` | `10` | Capture interval in seconds |
 | `REDIS_URL` | `redis://localhost:6379/1` | Redis URL for player mapping |
-| `RATE_SETTING` | `99k` | QL rate setting tag for InfluxDB |
+| `RATE_SETTING` | `99k` | QL rate setting tag for InfluxDB (all ports) |
+| `RATE_SETTING_<port>` | *(empty)* | Per-port rate override (e.g. `RATE_SETTING_27960=99k`) |
 | `HOST_TAG` | *(empty)* | Host identifier for InfluxDB — set this to distinguish hosts |
 | `INSTALL_INFLUXDB` | `0` | Set to `1` to deploy InfluxDB in Docker |
 | `INFLUX_ALLOWLIST_IP` | *(empty)* | External IP to allow through firewall to InfluxDB |
@@ -330,16 +331,25 @@ INTERFACE=enp1s0
 PORTS=27960-27962
 INTERVAL=10
 REDIS_URL=redis://localhost:6379/3
-RATE_SETTING=99k
 HOST_TAG=texas
 INFLUX_URL=http://127.0.0.1:8086
 INFLUX_ORG=ql
 INFLUX_BUCKET=ql_packet_fragmentation
 INFLUX_TOKEN_FILE=/opt/ql-packet-fragmentation/secrets/influxdb-token
+
+# Rate setting — per-port (preferred when ports differ):
+RATE_SETTING_27960=99k
+RATE_SETTING_27961=25k
+RATE_SETTING_27962=25k
+
+# Or a single value for all ports:
+# RATE_SETTING=99k
 ```
 
 Notes:
 
+- per-port `RATE_SETTING_<port>` vars take precedence; if any exist, bare
+  `RATE_SETTING` is ignored
 - `REDIS_URL` is required for player mapping
 - in multi-port mode, the collector reuses the Redis host/port/credentials and
   derives the DB index from each server port automatically
