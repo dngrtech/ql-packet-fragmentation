@@ -1,9 +1,9 @@
 """
-serverchecker — system plugin, always loaded by qlds-ui.
+serverchecker — minqlx plugin for live server status.
 
-Writes live server status to Redis every 10 seconds so the qlds-ui management
-interface can surface real-time player counts, map, game state, and player
-details on the /servers page.
+Writes live server status to Redis every 10 seconds, surfacing real-time
+player counts, map, game state, and player details. Also used by the
+ql-packet-fragmentation collector for per-player UDP port mapping.
 
 Redis key: minqlx:server_status:<port>  (e.g. minqlx:server_status:27960)
 """

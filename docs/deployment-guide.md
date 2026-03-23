@@ -42,10 +42,10 @@ step failure aborts the entire run. If it fails partway through, see
 
 ### Running via SSH from a management host
 
-Typical pattern using an SSH key from the qlds-ui terraform directory:
+Typical pattern using an SSH key:
 
 ```bash
-sudo ssh -i /opt/qlds-ui/terraform/ssh-keys/<HOST_KEY> \
+sudo ssh -i /path/to/ssh-keys/<HOST_KEY> \
   -o StrictHostKeyChecking=accept-new root@<SERVER_IP> \
   'curl -fsSL https://raw.githubusercontent.com/dngrtech/ql-packet-fragmentation/main/scripts/deploy-debian12.sh | env \
     REPO_GIT_URL=https://github.com/dngrtech/ql-packet-fragmentation.git \
@@ -169,7 +169,7 @@ Copy the plugin from the repo into:
 - the shared/common plugin directory
 - each instance-specific plugin directory
 
-Example paths from the current qlds-ui layout:
+Example paths for a typical qlds layout:
 
 ```bash
 sudo install -m 644 \
@@ -464,7 +464,7 @@ sudo systemctl restart ql-packet-fragmentation.service
 Via SSH from the management host:
 
 ```bash
-sudo ssh -i /opt/qlds-ui/terraform/ssh-keys/<HOST_KEY> root@<SERVER_IP> \
+sudo ssh -i /path/to/ssh-keys/<HOST_KEY> root@<SERVER_IP> \
   'cd /opt/ql-packet-fragmentation && git pull --ff-only origin main && .venv/bin/pip install . --quiet && systemctl restart ql-packet-fragmentation.service && sleep 3 && systemctl status ql-packet-fragmentation.service'
 ```
 
