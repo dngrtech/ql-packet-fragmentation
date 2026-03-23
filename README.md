@@ -66,6 +66,24 @@ Notes:
   `--influx-bucket`, or a token/token file are omitted, the collector runs in
   terminal-only mode.
 
+## Debian 12 Deployment
+
+For a one-shot Debian 12 deployment on a qlds host, use
+[`scripts/deploy-debian12.sh`](scripts/deploy-debian12.sh). Example:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dngrtech/ql-packet-fragmentation/main/scripts/deploy-debian12.sh | sudo env REPO_GIT_URL=https://github.com/dngrtech/ql-packet-fragmentation.git PORTS=27960-27962 INTERFACE=enp1s0 REDIS_URL=redis://localhost:6379/3 bash
+```
+
+Optional features are controlled by environment variables:
+
+- `INSTALL_SERVERCHECKER=1` plus `QL_COMMON_PLUGIN_DIR` and/or `QL_INSTANCE_PLUGIN_DIR_TEMPLATE`
+- `INSTALL_INFLUXDB=1` plus optional `INFLUX_ALLOWLIST_IP`
+- `REPO_REF=<tag-or-commit>` if you want to deploy a specific revision
+
+The full manual process remains documented in
+[`docs/deployment-guide.md`](docs/deployment-guide.md).
+
 ## InfluxDB Measurements
 
 When InfluxDB is enabled, each interval writes:

@@ -35,6 +35,33 @@ ip route get 1.1.1.1 | sed -n '1p'
 
 Use the `dev ...` interface from that output.
 
+## One-Shot Installer
+
+If you want a single non-interactive deployment command on Debian 12, the repo
+now includes [`scripts/deploy-debian12.sh`](../scripts/deploy-debian12.sh).
+
+Minimal collector-only install:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dngrtech/ql-packet-fragmentation/main/scripts/deploy-debian12.sh | sudo env REPO_GIT_URL=https://github.com/dngrtech/ql-packet-fragmentation.git PORTS=27960-27962 INTERFACE=enp1s0 REDIS_URL=redis://localhost:6379/3 bash
+```
+
+With plugin deployment and local InfluxDB:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dngrtech/ql-packet-fragmentation/main/scripts/deploy-debian12.sh | sudo env \
+  REPO_GIT_URL=https://github.com/dngrtech/ql-packet-fragmentation.git \
+  PORTS=27960-27962 \
+  INTERFACE=enp1s0 \
+  REDIS_URL=redis://localhost:6379/3 \
+  INSTALL_SERVERCHECKER=1 \
+  QL_COMMON_PLUGIN_DIR=/home/ql/assets/common/minqlx-plugins \
+  QL_INSTANCE_PLUGIN_DIR_TEMPLATE=/home/ql/qlds-%s/minqlx-plugins \
+  INSTALL_INFLUXDB=1 \
+  INFLUX_ALLOWLIST_IP=154.20.139.212 \
+  bash
+```
+
 ## 1. Sync the Repository
 
 Copy the repo to the target host:
