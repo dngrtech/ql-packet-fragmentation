@@ -49,7 +49,7 @@ sudo python3 run.py \
   --ports 27960-27963 \
   --interval 10 \
   --rate-setting 99k \
-  --host-tag texax \
+  --host-tag texas \
   --redis-url redis://localhost:6379/3 \
   --influx-url http://127.0.0.1:8086 \
   --influx-org ql \
@@ -76,7 +76,7 @@ For a one-shot Debian 12 deployment on a qlds host, use
 [`scripts/deploy-debian12.sh`](scripts/deploy-debian12.sh). Example:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/dngrtech/ql-packet-fragmentation/main/scripts/deploy-debian12.sh | sudo env REPO_GIT_URL=https://github.com/dngrtech/ql-packet-fragmentation.git PORTS=27960-27962 INTERFACE=enp1s0 REDIS_URL=redis://localhost:6379/3 HOST_TAG=texax bash
+curl -fsSL https://raw.githubusercontent.com/dngrtech/ql-packet-fragmentation/main/scripts/deploy-debian12.sh | sudo env REPO_GIT_URL=https://github.com/dngrtech/ql-packet-fragmentation.git PORTS=27960-27962 INTERFACE=enp1s0 REDIS_URL=redis://localhost:6379/3 HOST_TAG=texas bash
 ```
 
 Optional features are controlled by environment variables:

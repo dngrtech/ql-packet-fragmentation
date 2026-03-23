@@ -47,7 +47,7 @@ sudo /opt/ql-packet-fragmentation/.venv/bin/python /opt/ql-packet-fragmentation/
   --ports 27960-27963 \
   --interval 10 \
   --rate-setting 99k \
-  --host-tag texax \
+  --host-tag texas \
   --redis-url redis://localhost:6379/3 \
   --influx-url http://127.0.0.1:8086 \
   --influx-org ql \
