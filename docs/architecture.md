@@ -93,8 +93,15 @@ the official Python client.
 
 Measurements:
 
-- `packet_stats`: one point per server port
-- `player_packets`: one point per mapped player per server port
+- `packet_stats`: one point per `(host, server_port)` interval
+- `player_packets`: one point per mapped player per `(host, server_port)` interval
+
+Tags:
+
+- `host`
+- `server_port`
+- `rate_setting` when supplied
+- `steam_id` and `player_name` on `player_packets`
 
 ## Planned Extensions
 

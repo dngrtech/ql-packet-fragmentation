@@ -28,6 +28,7 @@ PORTS="${PORTS:-27960-27963}"
 INTERVAL="${INTERVAL:-10}"
 REDIS_URL="${REDIS_URL:-redis://localhost:6379/1}"
 RATE_SETTING="${RATE_SETTING:-99k}"
+HOST_TAG="${HOST_TAG:-}"
 INFLUX_URL="${INFLUX_URL:-}"
 INFLUX_ORG="${INFLUX_ORG:-}"
 INFLUX_BUCKET="${INFLUX_BUCKET:-}"
@@ -49,6 +50,7 @@ QL_INSTANCE_PLUGIN_DIR_TEMPLATE="${QL_INSTANCE_PLUGIN_DIR_TEMPLATE:-}"
 QL_SYSTEMD_TEMPLATE="${QL_SYSTEMD_TEMPLATE:-qlds@%s}"
 RESTART_QLDS="${RESTART_QLDS:-0}"
 APT_PACKAGES="${APT_PACKAGES:-curl openssl python3-venv python3-bpfcc bpfcc-tools redis-server}"
+APT_PACKAGES+=" linux-headers-$(uname -r)"
 
 if [[ -z "$INTERFACE" ]]; then
   echo "Failed to detect the outbound interface. Set INTERFACE explicitly." >&2
@@ -113,7 +115,7 @@ python3 -m venv --system-site-packages .venv
 .venv/bin/pip install .
 
 install -d -m 700 "$REPO_DIR/secrets"
-install -m 755 "$REPO_DIR/scripts/run-service.sh" "$REPO_DIR/scripts/run-service.sh"
+chmod 755 "$REPO_DIR/scripts/run-service.sh"
 
 cat > "$ENV_FILE" <<EOF
 INTERFACE=${INTERFACE}
@@ -121,6 +123,7 @@ PORTS=${PORTS}
 INTERVAL=${INTERVAL}
 REDIS_URL=${REDIS_URL}
 RATE_SETTING=${RATE_SETTING}
+HOST_TAG=${HOST_TAG}
 INFLUX_URL=${INFLUX_URL}
 INFLUX_ORG=${INFLUX_ORG}
 INFLUX_BUCKET=${INFLUX_BUCKET}

@@ -50,6 +50,11 @@ def parse_args():
         help="Label for the current rate setting (for display only)",
     )
     parser.add_argument(
+        "--host-tag",
+        default=None,
+        help="Host identifier tag for InfluxDB writes (defaults to local hostname)",
+    )
+    parser.add_argument(
         "--influx-url",
         default=None,
         help="InfluxDB base URL (e.g. http://127.0.0.1:8086)",
@@ -133,6 +138,7 @@ def main():
         token=influx_token,
         org=args.influx_org,
         bucket=args.influx_bucket,
+        host_tag=args.host_tag,
     )
 
     try:

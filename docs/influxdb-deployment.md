@@ -47,6 +47,7 @@ sudo /opt/ql-packet-fragmentation/.venv/bin/python /opt/ql-packet-fragmentation/
   --ports 27960-27963 \
   --interval 10 \
   --rate-setting 99k \
+  --host-tag texax \
   --redis-url redis://localhost:6379/3 \
   --influx-url http://127.0.0.1:8086 \
   --influx-org ql \
@@ -70,7 +71,17 @@ Recommended install on the host:
 4. Run `systemctl daemon-reload`.
 5. Run `systemctl enable --now ql-packet-fragmentation.service`.
 
+When multiple qlds hosts write to the same InfluxDB bucket, set `HOST_TAG` in
+the env file so points remain attributable to the source machine.
+
 ## Measurements
 
 - `packet_stats`
 - `player_packets`
+
+Tags written by the collector:
+
+- `host`
+- `server_port`
+- `rate_setting` when configured
+- `steam_id` and `player_name` for `player_packets`

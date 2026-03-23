@@ -20,6 +20,10 @@ if [[ -n "${RATE_SETTING:-}" ]]; then
   cmd+=(--rate-setting "$RATE_SETTING")
 fi
 
+if [[ -n "${HOST_TAG:-}" ]]; then
+  cmd+=(--host-tag "$HOST_TAG")
+fi
+
 if [[ -n "${INFLUX_URL:-}" ]]; then
   cmd+=(--influx-url "$INFLUX_URL")
 fi

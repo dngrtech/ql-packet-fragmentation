@@ -20,6 +20,7 @@ interval summaries to InfluxDB 2.x.
 - Linux with BPF support (kernel version frozen)
 - Python 3.8+
 - [BCC](https://github.com/iovisor/bcc) (bpfcc-tools / python3-bcc)
+- Kernel headers (`linux-headers-$(uname -r)`) — required for BCC to compile eBPF programs at runtime
 - pyroute2, redis-py
 - Root or `CAP_BPF` + `CAP_NET_ADMIN`
 
@@ -48,6 +49,7 @@ sudo python3 run.py \
   --ports 27960-27963 \
   --interval 10 \
   --rate-setting 99k \
+  --host-tag texax \
   --redis-url redis://localhost:6379/3 \
   --influx-url http://127.0.0.1:8086 \
   --influx-org ql \
@@ -65,6 +67,8 @@ Notes:
 - InfluxDB writes are optional. If any of `--influx-url`, `--influx-org`,
   `--influx-bucket`, or a token/token file are omitted, the collector runs in
   terminal-only mode.
+- When multiple qlds hosts write into one InfluxDB bucket, set `--host-tag`
+  or `HOST_TAG` so points remain attributable to a specific machine.
 
 ## Debian 12 Deployment
 
@@ -72,7 +76,7 @@ For a one-shot Debian 12 deployment on a qlds host, use
 [`scripts/deploy-debian12.sh`](scripts/deploy-debian12.sh). Example:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/dngrtech/ql-packet-fragmentation/main/scripts/deploy-debian12.sh | sudo env REPO_GIT_URL=https://github.com/dngrtech/ql-packet-fragmentation.git PORTS=27960-27962 INTERFACE=enp1s0 REDIS_URL=redis://localhost:6379/3 bash
+curl -fsSL https://raw.githubusercontent.com/dngrtech/ql-packet-fragmentation/main/scripts/deploy-debian12.sh | sudo env REPO_GIT_URL=https://github.com/dngrtech/ql-packet-fragmentation.git PORTS=27960-27962 INTERFACE=enp1s0 REDIS_URL=redis://localhost:6379/3 HOST_TAG=texax bash
 ```
 
 Optional features are controlled by environment variables:
@@ -92,6 +96,13 @@ When InfluxDB is enabled, each interval writes:
   fragmented packets, average size, max size, and histogram bucket counts
 - `player_packets`: one point per mapped player per QL server port with
   fragmented packet counts and average/max packet size
+
+InfluxDB tags include:
+
+- `host`
+- `server_port`
+- `rate_setting` when provided
+- `steam_id` and `player_name` for `player_packets`
 
 Deployment details for the current containerized setup are in
 [`docs/influxdb-deployment.md`](docs/influxdb-deployment.md).

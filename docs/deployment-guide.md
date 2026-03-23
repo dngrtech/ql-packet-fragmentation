@@ -43,7 +43,7 @@ now includes [`scripts/deploy-debian12.sh`](../scripts/deploy-debian12.sh).
 Minimal collector-only install:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/dngrtech/ql-packet-fragmentation/main/scripts/deploy-debian12.sh | sudo env REPO_GIT_URL=https://github.com/dngrtech/ql-packet-fragmentation.git PORTS=27960-27962 INTERFACE=enp1s0 REDIS_URL=redis://localhost:6379/3 bash
+curl -fsSL https://raw.githubusercontent.com/dngrtech/ql-packet-fragmentation/main/scripts/deploy-debian12.sh | sudo env REPO_GIT_URL=https://github.com/dngrtech/ql-packet-fragmentation.git PORTS=27960-27962 INTERFACE=enp1s0 REDIS_URL=redis://localhost:6379/3 HOST_TAG=texax bash
 ```
 
 With plugin deployment and local InfluxDB:
@@ -54,6 +54,7 @@ curl -fsSL https://raw.githubusercontent.com/dngrtech/ql-packet-fragmentation/ma
   PORTS=27960-27962 \
   INTERFACE=enp1s0 \
   REDIS_URL=redis://localhost:6379/3 \
+  HOST_TAG=texax \
   INSTALL_SERVERCHECKER=1 \
   QL_COMMON_PLUGIN_DIR=/home/ql/assets/common/minqlx-plugins \
   QL_INSTANCE_PLUGIN_DIR_TEMPLATE=/home/ql/qlds-%s/minqlx-plugins \
@@ -92,6 +93,7 @@ sudo apt-get install -y \
   python3-venv \
   python3-bpfcc \
   bpfcc-tools \
+  "linux-headers-$(uname -r)" \
   redis-server \
   docker.io \
   iptables-persistent
@@ -285,6 +287,7 @@ PORTS=27960-27962
 INTERVAL=10
 REDIS_URL=redis://localhost:6379/3
 RATE_SETTING=99k
+HOST_TAG=texax
 INFLUX_URL=http://127.0.0.1:8086
 INFLUX_ORG=ql
 INFLUX_BUCKET=ql_packet_fragmentation
