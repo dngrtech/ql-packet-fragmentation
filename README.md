@@ -132,4 +132,4 @@ Output (every 10 seconds):
 
 ## License
 
-MIT
+GPL-3.0
